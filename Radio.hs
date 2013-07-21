@@ -12,6 +12,7 @@ import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit
 import           Data.Conduit.Binary
 import           Network.HTTP.Conduit
+import           Network.MPD hiding (play)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -24,12 +25,14 @@ d = unsafePerformIO newEmptyMVar
 data SongMeta = SongMeta 
     { artist    :: String
     , album     :: String
-    , title      :: String
+    , title     :: String
     }
 
 class FromJSON a => Radio a where
     data Settings a :: *
+
     getPlaylist :: Settings a -> IO [a]
+
     songUrl :: Settings a -> a -> IO String
 
     songMeta :: a -> SongMeta
@@ -53,18 +56,17 @@ class FromJSON a => Radio a where
                 putStrLn (artist $ songMeta x)
                 putStrLn (title $ songMeta x)
                 
-                -- To avoid file handle race, readTag after download finished.
+                -- To avoid file handle race, writeTag after download finished.
                 unless (tagged x) $ do
                     let tag = setArtist (artist meta) 
                                 $ setAlbum (album meta)
                                 $ setTitle (title meta)
                                 $ emptyID3Tag
-                        --tag' = setTitle (title meta) tag
                     writeTag (home ++ "/radio.m4a") tag
                     return ()
 
                 -- Update song info (length)
-                MPD.withMPD $ MPD.update $ [MPD.Path "radio"]
+                withMPD $ update $ [Path "radio"]
                 putMVar d ())
             (\e -> do
                 print (e :: HttpException)
@@ -77,28 +79,30 @@ class FromJSON a => Radio a where
         Radio.play reqData xs
 
 mpdLoad = do
-    s <- MPD.withMPD $ do
-            MPD.clear
-            MPD.update $ [MPD.Path "radio"]
-            MPD.add "radio/radio.m4a"
+    s <- withMPD $ do
+            clear
+            update $ [Path "radio"]
+            add "radio/radio.m4a"
     case s of
         Right [p] -> do
-            MPD.withMPD $ MPD.play Nothing
+            withMPD $ MPD.play Nothing
             mpdPlay
         _                  -> mpdLoad
 
 mpdPlay = do
-    s <- MPD.withMPD $ MPD.idle [MPD.PlayerS]   -- block until paused/finished
-    st <- MPD.withMPD MPD.status
-    let st' = fmap MPD.stState st
+    s <- withMPD $ idle [PlayerS]   -- block until paused/finished
+    st <- withMPD status
+    let st' = fmap stState st
     print st'
     bd <- isEmptyMVar d
-    if st' == Right MPD.Stopped 
+    if st' == Right Stopped 
         then if bd 
                 then do                                     -- Slow Network
-                    MPD.withMPD $ MPD.play Nothing
+                    withMPD $ MPD.play Nothing
                     mpdPlay
-                else takeMVar d                             -- Finished
+                else do
+                    withMPD clear
+                    takeMVar d                             -- Finished
         else mpdPlay                                        -- Pause
 
 getRadioDir :: IO FilePath
