@@ -6,7 +6,7 @@ module Radio where
 import           Control.Concurrent.MVar
 import           Control.Concurrent
 import qualified Control.Exception as E
-import           Control.Monad (when)
+import           Control.Monad (unless)
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit
@@ -24,7 +24,7 @@ d = unsafePerformIO newEmptyMVar
 data SongMeta = SongMeta 
     { artist    :: String
     , album     :: String
-    , songname      :: String
+    , title      :: String
     }
 
 class FromJSON a => Radio a where
@@ -33,6 +33,8 @@ class FromJSON a => Radio a where
     songUrl :: Settings a -> a -> IO String
 
     songMeta :: a -> SongMeta
+
+    tagged :: a -> Bool
 
     play :: Settings a -> [a] -> IO ()
     play reqData [] = Radio.getPlaylist reqData >>= Radio.play reqData
@@ -49,15 +51,16 @@ class FromJSON a => Radio a where
                     response <- http req manager
                     responseBody response $$+- sinkFile (home ++ "/radio.m4a")
                 putStrLn (artist $ songMeta x)
-                putStrLn (songname $ songMeta x)
+                putStrLn (title $ songMeta x)
                 
                 -- To avoid file handle race, readTag after download finished.
-                (Right song) <- MPD.withMPD MPD.currentSong
-                let tag = MPD.sgGetTag MPD.Artist (fromJust song)
-                when (tag == Nothing) $ do
-                    let tag = setArtist (artist meta) emptyID3Tag
-                        tag' = setTitle (songname meta) tag
-                    writeTag (home ++ "/radio.m4a") tag'
+                unless (tagged x) $ do
+                    let tag = setArtist (artist meta) 
+                                $ setAlbum (album meta)
+                                $ setTitle (title meta)
+                                $ emptyID3Tag
+                        --tag' = setTitle (title meta) tag
+                    writeTag (home ++ "/radio.m4a") tag
                     return ()
 
                 -- Update song info (length)

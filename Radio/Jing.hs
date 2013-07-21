@@ -100,3 +100,5 @@ instance Radio.Radio Jing where
         return $ T.unpack surl
 
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
+
+    tagged x = True

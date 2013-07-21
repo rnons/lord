@@ -110,6 +110,8 @@ instance Radio.Radio Douban  where
 
     songMeta x = Radio.SongMeta (artist x) (albumtitle x) (title x)
 
+    tagged x = False
+
 
 -- Radio.play (Cid 6) []
 -- Radio.play (Musician "Sigur Ros") []
