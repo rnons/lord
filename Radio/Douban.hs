@@ -106,7 +106,7 @@ instance Radio.Radio Douban  where
                     ]
         getPlaylist' query
 
-    songUrl x = url x
+    songUrl dou x = return $ url x
 
     songMeta x = Radio.SongMeta (artist x) (albumtitle x) (title x)
 

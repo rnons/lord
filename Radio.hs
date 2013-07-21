@@ -6,6 +6,7 @@ module Radio where
 import           Control.Concurrent.MVar
 import           Control.Concurrent
 import qualified Control.Exception as E
+import           Control.Monad (when)
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit
@@ -28,29 +29,33 @@ data SongMeta = SongMeta
 class FromJSON a => Radio a where
     data Settings a :: *
     getPlaylist :: Settings a -> IO [a]
-    songUrl :: a -> String
+    songUrl :: Settings a -> a -> IO String
 
     songMeta :: a -> SongMeta
 
     play :: Settings a -> [a] -> IO ()
     play reqData [] = Radio.getPlaylist reqData >>= Radio.play reqData
     play reqData (x:xs) = do
-        print (songUrl x)
-        req <- parseUrl $ Radio.songUrl x
+        surl <- songUrl reqData x
+        print surl
+        req <- parseUrl surl
         home <- getRadioDir
         manager <- newManager def
         threadId <- forkIO $ E.catch 
             (do
                 runResourceT $ do 
                     response <- http req manager
-                    responseBody response $$+- sinkFile (home ++ "/radio.mp3")
+                    responseBody response $$+- sinkFile (home ++ "/radio.m4a")
                 putStrLn (artist $ songMeta x)
                 putStrLn (songname $ songMeta x)
-                let tag = setArtist (artist $ songMeta x) emptyID3Tag
-                    tag' = setTitle (songname $ songMeta x) tag
-                writeTag (home ++ "/radio.mp3") tag'
-                --MPD.withMPD $ MPD.update $ [MPD.Path "radio"]
-                MPD.withMPD $ MPD.update []
+                id3 <- readTag (home ++ "/radio.m4a")
+                when (id3 == Nothing) $ do
+                    let tag = setArtist (artist $ songMeta x) emptyID3Tag
+                        tag' = setTitle (songname $ songMeta x) tag
+                    writeTag (home ++ "/radio.m4a") tag'
+                    --MPD.withMPD $ MPD.update $ [MPD.Path "radio"]
+                    MPD.withMPD $ MPD.update []
+                    return ()
                 putMVar d ())
             (\e -> do
                 print (e :: HttpException)
@@ -59,27 +64,26 @@ class FromJSON a => Radio a where
                 --next)
         --mtid <- newMVar threadId
         threadDelay 3000000
-        mpdLoad $ songMeta x
+        mpdLoad
         Radio.play reqData xs
 
-mpdLoad meta = do
+mpdLoad = do
     {-
     home <- getRadioDir
     let tag = setArtist (artist meta) emptyID3Tag
         tag' = setTitle (songname meta) tag
-    writeTag (home ++ "/radio.mp3") tag'
+    writeTag (home ++ "/radio.m4a") tag'
     -}
     s <- MPD.withMPD $ do
             MPD.clear
             MPD.update []
-            let s' = MPD.sgAddTag MPD.Artist (MPD.Value $ C8.pack $ artist meta) (MPD.defaultSong "radio/radio.mp3")
             MPD.update $ [MPD.Path "radio"]
-            MPD.add "radio/radio.mp3"
+            MPD.add "radio/radio.m4a"
     case s of
         Right [p] -> do
             MPD.withMPD $ MPD.play Nothing
             mpdPlay
-        _                  -> mpdLoad meta
+        _                  -> mpdLoad
 
 mpdPlay = do
     s <- MPD.withMPD $ MPD.idle [MPD.PlayerS]   -- block until paused/finished
