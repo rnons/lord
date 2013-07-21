@@ -17,6 +17,7 @@ import           System.Directory (getHomeDirectory)
 import           System.IO.Unsafe (unsafePerformIO)
 import ID3.Simple
 import ID3.Type.Tag
+import Data.Maybe
 
 d = unsafePerformIO newEmptyMVar
 
@@ -36,6 +37,7 @@ class FromJSON a => Radio a where
     play :: Settings a -> [a] -> IO ()
     play reqData [] = Radio.getPlaylist reqData >>= Radio.play reqData
     play reqData (x:xs) = do
+        let meta = songMeta x
         surl <- songUrl reqData x
         print surl
         req <- parseUrl surl
@@ -48,14 +50,18 @@ class FromJSON a => Radio a where
                     responseBody response $$+- sinkFile (home ++ "/radio.m4a")
                 putStrLn (artist $ songMeta x)
                 putStrLn (songname $ songMeta x)
-                id3 <- readTag (home ++ "/radio.m4a")
-                when (id3 == Nothing) $ do
-                    let tag = setArtist (artist $ songMeta x) emptyID3Tag
-                        tag' = setTitle (songname $ songMeta x) tag
+                
+                -- To avoid file handle race, readTag after download finished.
+                (Right song) <- MPD.withMPD MPD.currentSong
+                let tag = MPD.sgGetTag MPD.Artist (fromJust song)
+                when (tag == Nothing) $ do
+                    let tag = setArtist (artist meta) emptyID3Tag
+                        tag' = setTitle (songname meta) tag
                     writeTag (home ++ "/radio.m4a") tag'
-                    --MPD.withMPD $ MPD.update $ [MPD.Path "radio"]
-                    MPD.withMPD $ MPD.update []
                     return ()
+
+                -- Update song info (length)
+                MPD.withMPD $ MPD.update $ [MPD.Path "radio"]
                 putMVar d ())
             (\e -> do
                 print (e :: HttpException)
@@ -68,15 +74,8 @@ class FromJSON a => Radio a where
         Radio.play reqData xs
 
 mpdLoad = do
-    {-
-    home <- getRadioDir
-    let tag = setArtist (artist meta) emptyID3Tag
-        tag' = setTitle (songname meta) tag
-    writeTag (home ++ "/radio.m4a") tag'
-    -}
     s <- MPD.withMPD $ do
             MPD.clear
-            MPD.update []
             MPD.update $ [MPD.Path "radio"]
             MPD.add "radio/radio.m4a"
     case s of
@@ -89,7 +88,7 @@ mpdPlay = do
     s <- MPD.withMPD $ MPD.idle [MPD.PlayerS]   -- block until paused/finished
     st <- MPD.withMPD MPD.status
     let st' = fmap MPD.stState st
-    --print st'
+    print st'
     bd <- isEmptyMVar d
     if st' == Right MPD.Stopped 
         then if bd 
