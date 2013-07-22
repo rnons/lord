@@ -66,7 +66,7 @@ class FromJSON a => Radio a where
                     return ()
 
                 -- Update song info (length)
-                withMPD $ update $ [Path "radio"]
+                withMPD $ update $ [Path "lord"]
                 putMVar d ())
             (\e -> do
                 print (e :: HttpException)
@@ -81,8 +81,8 @@ class FromJSON a => Radio a where
 mpdLoad = do
     s <- withMPD $ do
             clear
-            update $ [Path "radio"]
-            add "radio/radio.m4a"
+            update $ [Path "lord"]
+            add "lord/radio.m4a"
     case s of
         Right [p] -> do
             withMPD $ MPD.play Nothing
@@ -108,5 +108,5 @@ mpdPlay = do
 getRadioDir :: IO FilePath
 getRadioDir = do
    home <- getHomeDirectory
-   return $ home ++ "/.radio"
+   return $ home ++ "/.lord"
 

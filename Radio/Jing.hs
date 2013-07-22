@@ -24,6 +24,8 @@ import Network.HTTP.Types
 import Network.HTTP.Conduit
 import qualified Data.HashMap.Strict     as HM
 import Data.ByteString (ByteString)
+import qualified Data.Configurator as CF
+import System.Directory (doesFileExist)
 
 import Radio
 
@@ -102,3 +104,18 @@ instance Radio.Radio Jing where
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
 
     tagged x = True
+
+readToken :: ByteString -> IO (Maybe (Radio.Settings Jing))
+readToken cmbt = do
+    home <- Radio.getRadioDir
+    let path = home ++ "/lord.cfg"
+    exist <- doesFileExist path
+    if exist
+       then do
+            conf <- CF.load [ CF.Required path ]
+            atoken <- CF.lookup conf "token.atoken" :: IO (Maybe ByteString)
+            rtoken <- CF.lookup conf "token.rtoken" :: IO (Maybe ByteString)
+            uid <- CF.lookup conf "token.uid" :: IO (Maybe ByteString)
+            nick <- CF.lookup conf "token.nick" :: IO (Maybe ByteString)
+            return $ Token <$> atoken <*> rtoken <*> uid <*> nick <*> Just cmbt
+       else return Nothing

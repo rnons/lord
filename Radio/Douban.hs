@@ -94,7 +94,7 @@ instance Radio.Radio Douban  where
         let url = "http://douban.fm/j/mine/playlist"
             query = [ ("type", Just "n")
                     , ("channel", Just $ C8.pack $ show cid)
-                    , ("from", Just "radiocommander")
+                    , ("from", Just "lord")
                     ]
         getPlaylist' query
     getPlaylist (Musician name) = do
@@ -102,7 +102,7 @@ instance Radio.Radio Douban  where
         let query = [ ("type", Just "n")
                     , ("channel", Just "0")
                     , ("context", Just $ C8.pack $ ("channel:0|musician_id:" ++ fromJust mId))
-                    , ("from", Just "radiocommander")
+                    , ("from", Just "lord")
                     ]
         getPlaylist' query
 
