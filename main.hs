@@ -1,3 +1,4 @@
+import qualified Data.ByteString.Char8 as C
 import Data.Char (isDigit)
 import Options.Applicative
 
@@ -45,9 +46,12 @@ douban p
 
 jing :: String -> IO ()
 jing p = do
-    print p
     tok <- readToken p
     case tok of
-        Just tok' -> play tok' []
-        _         -> print "Token is invalid or not exist"
+        Just tok' -> do
+            putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
+            play tok' []
+        _         -> do
+            mtok <- login p
+            play mtok []
 
