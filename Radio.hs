@@ -4,23 +4,21 @@
 module Radio where
 
 import           Control.Concurrent.MVar
-import           Control.Concurrent
+import           Control.Concurrent (forkIO, threadDelay)
 import qualified Control.Exception as E
 import           Control.Monad (unless)
-import           Data.Aeson
-import qualified Data.ByteString.Char8 as C8
-import           Data.Conduit
-import           Data.Conduit.Binary
+import           Data.Aeson (FromJSON)
+import           Data.Conduit (runResourceT, ($$+-))
+import           Data.Conduit.Binary (sinkFile)
+import           ID3.Simple
+import           ID3.Type.Tag (emptyID3Tag)
 import           Network.HTTP.Conduit
 import           Network.MPD hiding (play)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
 import           System.IO.Unsafe (unsafePerformIO)
-import ID3.Simple
-import ID3.Type.Tag
-import Data.Maybe
 
-d = unsafePerformIO newEmptyMVar
+downloaded = unsafePerformIO newEmptyMVar
 
 data SongMeta = SongMeta 
     { artist    :: String
@@ -29,20 +27,19 @@ data SongMeta = SongMeta
     }
 
 class FromJSON a => Radio a where
-    data Settings a :: *
+    data Param a :: *
 
-    getPlaylist :: Settings a -> IO [a]
+    getPlaylist :: Param a -> IO [a]
 
-    songUrl :: Settings a -> a -> IO String
+    songUrl :: Param a -> a -> IO String
 
     songMeta :: a -> SongMeta
 
     tagged :: a -> Bool
 
-    play :: Settings a -> [a] -> IO ()
-    play reqData [] = Radio.getPlaylist reqData >>= Radio.play reqData
+    play :: Param a -> [a] -> IO ()
+    play reqData [] = getPlaylist reqData >>= play reqData
     play reqData (x:xs) = do
-        let meta = songMeta x
         surl <- songUrl reqData x
         print surl
         req <- parseUrl surl
@@ -51,37 +48,42 @@ class FromJSON a => Radio a where
         threadId <- forkIO $ E.catch 
             (do
                 runResourceT $ do 
-                    response <- http req manager
-                    responseBody response $$+- sinkFile (home ++ "/radio.m4a")
+                    res <- http req manager
+                    responseBody res $$+- sinkFile (home ++ "/radio.m4a")
+                -- This will block until downloaded.
+
                 putStrLn (artist $ songMeta x)
                 putStrLn (title $ songMeta x)
                 
-                -- To avoid file handle race, writeTag after download finished.
+                -- writeTag after downloaded to avoid file handle race.
                 unless (tagged x) $ do
-                    let tag = setArtist (artist meta) 
+                    let meta = songMeta x
+                        tag = setArtist (artist meta) 
                                 $ setAlbum (album meta)
                                 $ setTitle (title meta)
                                 $ emptyID3Tag
                     writeTag (home ++ "/radio.m4a") tag
+                    
+                    -- Update song info
+                    withMPD $ update [Path "lord"]
                     return ()
 
-                -- Update song info (length)
-                withMPD $ update $ [Path "lord"]
-                putMVar d ())
+                putMVar downloaded ())
             (\e -> do
                 print (e :: HttpException)
                 Radio.play reqData xs
                 )
-                --next)
+                
         --mtid <- newMVar threadId
         threadDelay 3000000
         mpdLoad
-        Radio.play reqData xs
+        play reqData xs
 
+mpdLoad :: IO ()
 mpdLoad = do
     s <- withMPD $ do
             clear
-            update $ [Path "lord"]
+            update [Path "lord"]
             add "lord/radio.m4a"
     case s of
         Right [p] -> do
@@ -89,12 +91,15 @@ mpdLoad = do
             mpdPlay
         _                  -> mpdLoad
 
+mpdPlay :: IO ()
 mpdPlay = do
-    s <- withMPD $ idle [PlayerS]   -- block until paused/finished
+    withMPD $ idle [PlayerS]   
+    -- This will block until paused/finished.
+
     st <- withMPD status
     let st' = fmap stState st
     print st'
-    bd <- isEmptyMVar d
+    bd <- isEmptyMVar downloaded
     if st' == Right Stopped 
         then if bd 
                 then do                                     -- Slow Network
@@ -102,7 +107,7 @@ mpdPlay = do
                     mpdPlay
                 else do
                     withMPD clear
-                    takeMVar d                             -- Finished
+                    takeMVar downloaded                     -- Finished
         else mpdPlay                                        -- Pause
 
 getRadioDir :: IO FilePath

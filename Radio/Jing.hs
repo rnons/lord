@@ -1,36 +1,29 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 module Radio.Jing where
 
-import Prelude hiding (id)
-import Control.Applicative
-import Control.Monad (mzero)
-import Control.Monad.Reader
-import Data.Aeson
-import qualified Data.Aeson.Generic as G
+import           Control.Applicative ((<$>), (<*>))
+import           Codec.Binary.UTF8.String (encodeString)
+import           Data.Aeson
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
-import Data.Data
-import Data.Map
-import Data.Maybe (fromJust)
+import           Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Data.Typeable
-import GHC.Generics
-import Data.CaseInsensitive
-import Data.Conduit
-import Data.Conduit.Attoparsec (sinkParser)
-import Network.HTTP.Types
-import Network.HTTP.Conduit
-import qualified Data.HashMap.Strict     as HM
-import Data.ByteString (ByteString)
+import           GHC.Generics (Generic)
+import           Data.CaseInsensitive (mk)
+import           Data.Conduit (($$+-))
+import           Data.Conduit.Attoparsec (sinkParser)
+import           Network.HTTP.Types 
+import           Network.HTTP.Conduit
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Configurator as CF
-import System.Directory (doesFileExist)
-import Codec.Binary.UTF8.String (encodeString)
+import           System.Directory (doesFileExist)
 
 import Radio
 
-type Settings a = Radio.Settings Jing
+type Param a = Radio.Param Jing
 
 data Jing = Jing 
     { abid :: Int       -- album id
@@ -49,7 +42,7 @@ data Jing = Jing
 instance FromJSON Jing
 
 instance Radio.Radio Jing where
-    data Settings Jing = Token
+    data Param Jing = Token
         { aToken    :: ByteString
         , rToken    :: ByteString
         , uid       :: ByteString
@@ -69,6 +62,7 @@ instance Radio.Radio Jing where
                     ]
             aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
             rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
+
         initReq <- parseUrl url
         let req = initReq { requestHeaders = [aHdr, rHdr] }
 
@@ -78,8 +72,9 @@ instance Radio.Radio Jing where
         (Object hm) <- withManager $ \manager -> do
             res <- http req' manager
             responseBody res $$+- sinkParser json
+
         let (Object hm') = fromJust $ HM.lookup "result" hm
-        let songs = fromJust $ HM.lookup "items" hm'
+            songs = fromJust $ HM.lookup "items" hm'
             pls = fromJSON songs :: Result [Jing]
         case pls of
             Success s -> return s
@@ -92,6 +87,7 @@ instance Radio.Radio Jing where
                     ] :: Query
             aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
             rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
+
         initReq <- parseUrl url
         let req = initReq { method = "POST"
                           , requestHeaders = [aHdr, rHdr]
@@ -105,9 +101,10 @@ instance Radio.Radio Jing where
 
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
 
+    -- Songs from jing.fm comes with tags!
     tagged x = True
 
-readToken :: String -> IO (Maybe (Radio.Settings Jing))
+readToken :: String -> IO (Maybe (Radio.Param Jing))
 readToken cmbt = do
     home <- Radio.getRadioDir
     let path = home ++ "/lord.cfg"
@@ -123,5 +120,5 @@ readToken cmbt = do
                            <*> rtoken 
                            <*> uid 
                            <*> nick 
-                           <*> (Just cmbt)
+                           <*> Just cmbt
        else return Nothing

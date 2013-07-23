@@ -3,29 +3,25 @@
 
 module Radio.Douban where
 
-import qualified Radio
-import Data.Maybe
-import qualified Data.HashMap.Strict     as HM
-import Control.Applicative
-import Control.Monad
-import Data.Aeson
-import Data.Conduit
-import Data.Conduit.Attoparsec (sinkParser)
-import Network.HTTP.Conduit
-import Codec.Binary.UTF8.String (encodeString, decodeString)
-import qualified Data.Text.Lazy.Encoding as TLE
-import Network.HTTP.Types
-import Text.HTML.TagSoup
-import Data.Char (isDigit)
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Char8 as LC8
-import Text.HTML.DOM (parseLBS)
-import Text.XML.Cursor
+import           Codec.Binary.UTF8.String (encodeString)
+import           Control.Applicative ((<$>), (<*>))
+import           Control.Monad
+import           Data.Aeson
+import qualified Data.ByteString.Char8 as C
+import           Data.Char (isDigit)
+import           Data.Conduit (($$+-))
+import           Data.Conduit.Attoparsec (sinkParser)
+import qualified Data.HashMap.Strict as HM
+import           Data.Maybe (fromJust)
 import qualified Data.Text as T
-import qualified Data.Vector as V
---import Data.Typeable
+import           Network.HTTP.Conduit
+import           Network.HTTP.Types (urlEncode, renderQuery)
+import           Text.HTML.DOM (parseLBS)
+import           Text.XML.Cursor
 
-type Settings a = Radio.Settings Douban
+import qualified Radio
+
+type Param a = Radio.Param Douban
 
 data Douban = Douban {
         picture :: String,
@@ -70,6 +66,8 @@ getPlaylist' query = do
     (Object hm) <- withManager $ \manager -> do
         response <- http req manager
         responseBody response $$+- sinkParser json
+
+    -- TODO: those without ssid filed are ads, filter them out!
     let songs = fromJust $ HM.lookup "song" hm
         pls = fromJSON songs :: Result [Douban]
     case pls of
@@ -79,7 +77,7 @@ getPlaylist' query = do
 musicianID :: String -> IO (Maybe String)
 musicianID name = do
     let url = "http://music.douban.com/search/" ++ 
-              (C8.unpack $ urlEncode True (C8.pack $ encodeString name))
+              (C.unpack $ urlEncode True (C.pack $ encodeString name))
     rsp <- simpleHttp url
     let cursor = fromDocument $ parseLBS rsp
         href = cursor $// element "a" 
@@ -88,12 +86,12 @@ musicianID name = do
     return $ Just $ filter isDigit $ T.unpack $ head $ head href
 
 instance Radio.Radio Douban  where
-    data Settings Douban = Cid Int | Musician String
+    data Param Douban = Cid Int | Musician String
 
     getPlaylist (Cid cid) = do
         let url = "http://douban.fm/j/mine/playlist"
             query = [ ("type", Just "n")
-                    , ("channel", Just $ C8.pack $ show cid)
+                    , ("channel", Just $ C.pack $ show cid)
                     , ("from", Just "lord")
                     ]
         getPlaylist' query
@@ -101,7 +99,7 @@ instance Radio.Radio Douban  where
         mId <- musicianID name
         let query = [ ("type", Just "n")
                     , ("channel", Just "0")
-                    , ("context", Just $ C8.pack $ ("channel:0|musician_id:" ++ fromJust mId))
+                    , ("context", Just $ C.pack ("channel:0|musician_id:" ++ fromJust mId))
                     , ("from", Just "lord")
                     ]
         getPlaylist' query
@@ -110,6 +108,7 @@ instance Radio.Radio Douban  where
 
     songMeta x = Radio.SongMeta (artist x) (albumtitle x) (title x)
 
+    -- Songs from douban.fm comes with no tags!
     tagged x = False
 
 
