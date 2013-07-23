@@ -10,7 +10,7 @@ import Control.Monad (mzero)
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.Aeson.Generic as G
-import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Char8 as C
 import Data.Data
 import Data.Map
 import Data.Maybe (fromJust)
@@ -26,6 +26,7 @@ import qualified Data.HashMap.Strict     as HM
 import Data.ByteString (ByteString)
 import qualified Data.Configurator as CF
 import System.Directory (doesFileExist)
+import Codec.Binary.UTF8.String (encodeString)
 
 import Radio
 
@@ -43,7 +44,7 @@ data Jing = Jing
     , n    :: String    -- song name
     , tid  :: Int
     --, y    :: Bool
-    } deriving Generic
+    } deriving (Show, Generic)
 
 instance FromJSON Jing
 
@@ -53,28 +54,29 @@ instance Radio.Radio Jing where
         , rToken    :: ByteString
         , uid       :: ByteString
         , nick      :: ByteString 
-        , cmbt      :: ByteString
+        , cmbt      :: String
         } deriving (Show)
 
     getPlaylist tok = do
         let url = "http://jing.fm/api/v1/search/jing/fetch_pls"
-            query = [ ("q", Just $ cmbt tok)
-                    , ("ps", Just "5")
-                    , ("st", Just "0")
-                    , ("u", Just $ uid tok)
-                    , ("tid", Just "0")
-                    , ("mt", Nothing)
-                    , ("ss", Just "true")
-                    ] :: Query
+            query = [ ("q", C.pack $ encodeString $ cmbt tok)
+                    , ("ps", "5")
+                    , ("st", "0")
+                    , ("u", uid tok)
+                    , ("tid", "0")
+                    , ("mt", "")
+                    , ("ss", "true")
+                    ]
             aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
             rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
         initReq <- parseUrl url
-        let req = initReq { method = "POST"
-                          , requestHeaders = [aHdr, rHdr]
-                          , queryString = renderQuery False query
-                          }
+        let req = initReq { requestHeaders = [aHdr, rHdr] }
+
+        -- urlEncodeBody adds a content-type request header and
+        -- changes the method to POST.
+        let req' = urlEncodedBody query req
         (Object hm) <- withManager $ \manager -> do
-            res <- http req manager
+            res <- http req' manager
             responseBody res $$+- sinkParser json
         let (Object hm') = fromJust $ HM.lookup "result" hm
         let songs = fromJust $ HM.lookup "items" hm'
@@ -105,7 +107,7 @@ instance Radio.Radio Jing where
 
     tagged x = True
 
-readToken :: ByteString -> IO (Maybe (Radio.Settings Jing))
+readToken :: String -> IO (Maybe (Radio.Settings Jing))
 readToken cmbt = do
     home <- Radio.getRadioDir
     let path = home ++ "/lord.cfg"
@@ -117,5 +119,9 @@ readToken cmbt = do
             rtoken <- CF.lookup conf "token.rtoken" :: IO (Maybe ByteString)
             uid <- CF.lookup conf "token.uid" :: IO (Maybe ByteString)
             nick <- CF.lookup conf "token.nick" :: IO (Maybe ByteString)
-            return $ Token <$> atoken <*> rtoken <*> uid <*> nick <*> Just cmbt
+            return $ Token <$> atoken 
+                           <*> rtoken 
+                           <*> uid 
+                           <*> nick 
+                           <*> (Just cmbt)
        else return Nothing
