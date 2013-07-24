@@ -1,0 +1,42 @@
+name:                lord
+version:             2013.7.24
+synopsis:            Lord of radio daemon
+description:         A unified interface to online radio service provider, use mpd as backend.
+homepage:            https://github.com/rnons/lord
+bug-reports:         https://github.com/rnons/lord/issues
+license:             PublicDomain
+license-file:        LICENSE
+author:              rnons
+maintainer:          remotenonsense@gmail.com
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.8
+tested-with:         GHC == 7.6.3
+
+source-repository   head
+  type:             git
+  location:         git://github.com/rnons/lord.git
+ 
+executable lord
+  main-is:              main.hs         
+  -- other-modules:       
+  build-depends:        base >= 4 && < 5, 
+                        aeson >= 0.6, 
+                        ansi-terminal >= 0.6, 
+                        attoparsec-conduit >= 1.0, 
+                        bytestring >= 0.9, 
+                        case-insensitive >= 1.0, 
+                        conduit >= 1.0, 
+                        configurator >= 0.2, 
+                        directory >= 1.1, 
+                        html-conduit >= 1.1, 
+                        http-conduit >= 1.9, 
+                        http-types >= 0.8, 
+                        idiii >= 0.1, 
+                        libmpd >= 0.8, 
+                        optparse-applicative >= 0.5,
+                        text >= 0.11, 
+                        transformers >= 0.3, 
+                        unordered-containers >= 0.2, 
+                        utf8-string >= 0.3, 
+                        xml-conduit >= 1.1
