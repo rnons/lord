@@ -16,6 +16,8 @@ import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 import           Network.HTTP.Conduit
 import           Network.HTTP.Types (urlEncode, renderQuery)
+import           Prelude hiding (id)
+import           System.Console.ANSI
 import           Text.HTML.DOM (parseLBS)
 import           Text.XML.Cursor
 
@@ -23,22 +25,22 @@ import qualified Radio
 
 type Param a = Radio.Param Douban
 
-data Douban = Douban {
-        picture :: String,
-        albumtitle :: String,
-        --company :: String,
-        --rating_avg :: Float,
-        --public_time :: String,
-        ssid :: Maybe String,
-        album :: String,
-        --like :: Int,
-        artist :: String,
-        url :: String,
-        title :: String,
-        subtype :: String,
-        --length :: Int,
-        sid :: String,
-        aid :: String
+data Douban = Douban 
+    { picture :: String
+    , albumtitle :: String
+    -- , company :: String
+    -- , rating_avg :: Float
+    -- , public_time :: String
+    , ssid :: Maybe String
+    , album :: String
+    -- , like :: Int
+    , artist :: String
+    , url :: String
+    , title :: String
+    , subtype :: String
+    -- , length :: Int
+    , sid :: String
+    , aid :: String
     } deriving Show
 
 instance FromJSON Douban where
@@ -64,8 +66,8 @@ getPlaylist' query = do
                       , queryString = renderQuery False query
                       }
     (Object hm) <- withManager $ \manager -> do
-        response <- http req manager
-        responseBody response $$+- sinkParser json
+        res <- http req manager
+        responseBody res $$+- sinkParser json
 
     -- TODO: those without ssid filed are ads, filter them out!
     let songs = fromJust $ HM.lookup "song" hm
@@ -114,3 +116,81 @@ instance Radio.Radio Douban  where
 
 -- Radio.play (Cid 6) []
 -- Radio.play (Musician "Sigur Ros") []
+
+data Channel = Channel 
+    { intro :: String
+    , name :: String
+    , song_num :: Int
+    -- , creator :: Creator
+    , banner :: String
+    , cover :: String
+    , id :: Int
+    , hot_songs :: [String]
+    } deriving (Eq, Show)
+
+instance FromJSON Channel where
+    parseJSON (Object v) = Channel <$>
+                           v .: "intro" <*>
+                           v .: "name" <*>
+                           v .: "song_num" <*>
+                           v .: "banner" <*>
+                           v .: "cover" <*>
+                           v .: "id" <*>
+                           v .: "hot_songs"
+    parseJSON _          = mzero
+
+
+pprChannels chs =
+    forM_ chs (\c -> do
+        setSGR [SetConsoleIntensity BoldIntensity]
+        putStr $ "* " ++ name c 
+        setSGR [SetColor Foreground Vivid Green]
+        putStrLn $ " cid=" ++ show (id c)
+        setSGR [Reset]
+        let folding = foldr (\x acc -> 
+                      if x `elem` "\r\n" then ' ':acc else x:acc) []
+        putStrLn $ "    Intro: " ++ folding (intro c) 
+        putStr "    Hot songs: " 
+        forM_ (hot_songs c) (\s -> putStr $ s ++ ", ")
+        putStrLn ""
+        )
+
+-- | Return a list of hot channels.
+hot :: IO [Channel]
+hot = search' url
+  where
+    url = "http://douban.fm/j/explore/hot_channels"
+
+
+-- | Return a list of up trending channels.
+trending :: IO [Channel]
+trending = search' url
+  where
+    url = "http://douban.fm/j/explore/up_trending_channels"
+
+
+-- | Return a list of channels matching provided keywords.
+search :: String -> IO [Channel]
+search [] = return []
+search key = search' url
+  where 
+    url = "http://douban.fm/j/explore/search?query=" ++ 
+          -- encodeString: encode chinese characters
+          (C.unpack $ urlEncode True (C.pack $ encodeString key))
+
+
+search' :: String -> IO [Channel]
+search' url = do
+    req <- parseUrl url
+    (Object hm) <- withManager $ \manager -> do
+        res <- http req manager
+        responseBody res $$+- sinkParser json
+
+    let (Object hm') = fromJust $ HM.lookup "data" hm
+        resData = fromJust $ HM.lookup "channels" hm'
+        channels = fromJSON resData :: Result [Channel]
+    case channels of
+        Success c -> return c
+        Error err -> putStrLn err >> print resData >> return []
+
+

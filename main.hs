@@ -10,8 +10,17 @@ data Options = Options
     { optCommand    :: Command
     } deriving (Eq, Show)
 
-data Command = DoubanRadio String
-             | JingRadio String
+data Command = DoubanRadio DoubanSubCommand
+             | JingRadio JingSubCommand
+    deriving (Eq, Show)
+
+data DoubanSubCommand = DoubanListen String
+                      | DoubanHot
+                      | DoubanTrending
+                      | DoubanSearch String
+    deriving (Eq, Show)
+
+data JingSubCommand = JingListen String
     deriving (Eq, Show)
 
 
@@ -28,24 +37,56 @@ main = do
     o <- execParser $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
     case optCommand o of
-        DoubanRadio param -> douban param
-        JingRadio param   -> jing param
+        DoubanRadio subCommand -> 
+            case subCommand of
+                 DoubanListen param -> doubanListen param
+                 DoubanHot -> doubanHot
+                 DoubanTrending -> doubanTrending
+                 DoubanSearch param -> doubanSearch param
+        JingRadio (JingListen param) -> jingListen param
 
 doubanOptions :: Parser Command
-doubanOptions = DoubanRadio <$> argument str ( metavar "[<channel_id> | <musician>]" )
+doubanOptions = DoubanRadio <$> 
+                   subparser ( command "listen" (info doubanListenOptions
+                                    (progDesc "listen to cid/musician"))
+                            <> command "hot" (info (pure DoubanHot)
+                                    (progDesc "hot channels"))
+                            <> command "trending" (info (pure DoubanTrending)
+                                    (progDesc "trending up channels"))
+                            <> command "search" (info doubanSearchOptions
+                                    (progDesc "search channels"))
+                             )
+
+doubanListenOptions :: Parser DoubanSubCommand
+doubanListenOptions = DoubanListen <$> argument str ( metavar "[<channel_id> | <musician>]" )
+
+doubanSearchOptions :: Parser DoubanSubCommand
+doubanSearchOptions = DoubanSearch <$> argument str ( metavar "KEYWORDS" )
 
 jingOptions :: Parser Command
-jingOptions = JingRadio <$> argument str ( metavar "<keywords>" )
+jingOptions = JingRadio <$> 
+                 subparser ( command "listen" (info jingListenOptions
+                                 (progDesc "listen to jing.fm"))
+                           )
 
-douban :: String -> IO ()
-douban p 
+jingListenOptions :: Parser JingSubCommand
+jingListenOptions = JingListen <$> argument str ( metavar "KEYWORDS" )
+
+doubanListen :: String -> IO ()
+doubanListen p 
     | isChId p = play (Cid $ read p) []
     | otherwise = play (Musician p) []
   where
     isChId = and . fmap isDigit
 
-jing :: String -> IO ()
-jing p = do
+doubanHot = hot >>= pprChannels
+
+doubanTrending = trending >>= pprChannels
+
+doubanSearch key = search key >>= pprChannels
+
+jingListen :: String -> IO ()
+jingListen p = do
     tok <- readToken p
     case tok of
         Just tok' -> do
