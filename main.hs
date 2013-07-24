@@ -26,10 +26,10 @@ data JingSubCommand = JingListen String
 
 optParser :: Parser Options
 optParser = Options 
-    <$> subparser ( command "douban"       (info doubanOptions
-                        (progDesc "Play douban.fm"))
-                 <> command "jing"         (info jingOptions
-                        (progDesc "Play jing.fm"))
+    <$> subparser ( command "douban"       (info (helper <*> doubanOptions)
+                        (progDesc "douban.fm commander"))
+                 <> command "jing"         (info (helper <*> jingOptions)
+                        (progDesc "jing.fm commander"))
                   )
 
 main :: IO ()
@@ -48,29 +48,35 @@ main = do
 doubanOptions :: Parser Command
 doubanOptions = DoubanRadio <$> 
                    subparser ( command "listen" (info doubanListenOptions
-                                    (progDesc "listen to cid/musician"))
+                                    (progDesc "Provide cid/musician to listen to douban.fm"))
+                            <> command "search" (info doubanSearchOptions
+                                    (progDesc "search channels"))
                             <> command "hot" (info (pure DoubanHot)
                                     (progDesc "hot channels"))
                             <> command "trending" (info (pure DoubanTrending)
                                     (progDesc "trending up channels"))
-                            <> command "search" (info doubanSearchOptions
-                                    (progDesc "search channels"))
                              )
 
 doubanListenOptions :: Parser DoubanSubCommand
-doubanListenOptions = DoubanListen <$> argument str ( metavar "[<channel_id> | <musician>]" )
+doubanListenOptions = 
+    helper <*> 
+    ( DoubanListen <$> argument str (metavar "[<channel_id> | <musician>]") )
 
 doubanSearchOptions :: Parser DoubanSubCommand
-doubanSearchOptions = DoubanSearch <$> argument str ( metavar "KEYWORDS" )
+doubanSearchOptions = 
+    helper <*> 
+    ( DoubanSearch <$> argument str (metavar "KEYWORDS") )
 
 jingOptions :: Parser Command
 jingOptions = JingRadio <$> 
                  subparser ( command "listen" (info jingListenOptions
-                                 (progDesc "listen to jing.fm"))
+                                 (progDesc "Provide keywords to listen to jing.fm"))
                            )
 
 jingListenOptions :: Parser JingSubCommand
-jingListenOptions = JingListen <$> argument str ( metavar "KEYWORDS" )
+jingListenOptions = 
+    helper <*> 
+    ( JingListen <$> argument str (metavar "KEYWORDS") )
 
 doubanListen :: String -> IO ()
 doubanListen p 
