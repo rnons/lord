@@ -86,7 +86,7 @@ mpdLoad = do
             update [Path "lord"]
             add "lord/radio.m4a"
     case s of
-        Right [p] -> do
+        Right _ -> do
             withMPD $ MPD.play Nothing
             mpdPlay
         _                  -> mpdLoad

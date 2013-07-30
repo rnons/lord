@@ -85,10 +85,13 @@ doubanListen p
   where
     isChId = and . fmap isDigit
 
+doubanHot :: IO ()
 doubanHot = hot >>= pprChannels
 
+doubanTrending :: IO ()
 doubanTrending = trending >>= pprChannels
 
+doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
 
 jingListen :: String -> IO ()

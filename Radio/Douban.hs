@@ -15,7 +15,7 @@ import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 import           Network.HTTP.Conduit
-import           Network.HTTP.Types (urlEncode, renderQuery)
+import           Network.HTTP.Types (urlEncode, renderQuery, Query)
 import           Prelude hiding (id)
 import           System.Console.ANSI
 import           Text.HTML.DOM (parseLBS)
@@ -59,6 +59,7 @@ instance FromJSON Douban where
     parseJSON _          = mzero
 
 
+getPlaylist' :: Query -> IO [Douban]
 getPlaylist' query = do
     let url = "http://douban.fm/j/mine/playlist"
     initReq <- parseUrl url
@@ -91,8 +92,7 @@ instance Radio.Radio Douban  where
     data Param Douban = Cid Int | Musician String
 
     getPlaylist (Cid cid) = do
-        let url = "http://douban.fm/j/mine/playlist"
-            query = [ ("type", Just "n")
+        let query = [ ("type", Just "n")
                     , ("channel", Just $ C.pack $ show cid)
                     , ("from", Just "lord")
                     ]
@@ -106,16 +106,12 @@ instance Radio.Radio Douban  where
                     ]
         getPlaylist' query
 
-    songUrl dou x = return $ url x
+    songUrl _ x = return $ url x
 
     songMeta x = Radio.SongMeta (artist x) (albumtitle x) (title x)
 
     -- Songs from douban.fm comes with no tags!
-    tagged x = False
-
-
--- Radio.play (Cid 6) []
--- Radio.play (Musician "Sigur Ros") []
+    tagged _ = False
 
 data Channel = Channel 
     { intro :: String
@@ -140,6 +136,7 @@ instance FromJSON Channel where
     parseJSON _          = mzero
 
 
+pprChannels :: [Channel] -> IO ()
 pprChannels chs =
     forM_ chs (\c -> do
         setSGR [SetConsoleIntensity BoldIntensity]

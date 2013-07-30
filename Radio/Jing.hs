@@ -6,7 +6,6 @@ module Radio.Jing where
 
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad
-import           Control.Monad.IO.Class (liftIO)
 import           Codec.Binary.UTF8.String (encodeString)
 import           Data.Aeson
 import           Data.ByteString (ByteString)
@@ -116,7 +115,7 @@ instance Radio.Radio Jing where
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
 
     -- Songs from jing.fm comes with tags!
-    tagged x = True
+    tagged _ = True
 
 login :: String -> IO (Radio.Param Jing)
 login cmbt = do
@@ -151,7 +150,6 @@ createSession cmbt email pwd = do
         rtoken = HM.lookup "Jing-R-Token-Header" hmap
     (Object hm) <- runResourceT $ responseBody res $$+- sinkParser json
 
-    let (Object hm') = fromJust $ HM.lookup "result" hm
     case HM.lookup "result" hm of
         Just (Object hm') -> do
             let user = fromJust $ HM.lookup "usr" hm'
@@ -172,6 +170,7 @@ saveToken tok = do
     writeFile (home ++ "/lord.cfg") $ pprToken tok
     putStrLn "Your token has been saved to ~/lord.cfg"
 
+pprToken :: Radio.Param Jing -> String
 pprToken tok = unlines [ "token"
                        , "{"
                        , "    atoken = \"" ++ C.unpack (aToken tok) ++ "\""
