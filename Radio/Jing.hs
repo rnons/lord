@@ -12,7 +12,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Configurator as CF
 import qualified Data.HashMap.Strict as HM
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
 import           Data.CaseInsensitive (mk)
@@ -63,6 +63,13 @@ instance Radio.Radio Jing where
         , cmbt      :: String
         } deriving (Show)
 
+    parsePlaylist (Object hm) = do
+        let songs = HM.lookup "result" hm >>= 
+                    \(Object hm') -> HM.lookup "items" hm'
+        case fromJSON $ fromMaybe Null songs of
+            Success s -> s
+            Error err -> []
+
     getPlaylist tok = do
         let url = "http://jing.fm/api/v1/search/jing/fetch_pls"
             query = [ ("q", C.pack $ encodeString $ cmbt tok)
@@ -82,16 +89,9 @@ instance Radio.Radio Jing where
         -- urlEncodeBody adds a content-type request header and
         -- changes the method to POST.
         let req' = urlEncodedBody query req
-        (Object hm) <- withManager $ \manager -> do
+        withManager $ \manager -> do
             res <- http req' manager
-            responseBody res $$+- sinkParser json
-
-        let (Object hm') = fromJust $ HM.lookup "result" hm
-            songs = fromJust $ HM.lookup "items" hm'
-            pls = fromJSON songs :: Result [Jing]
-        case pls of
-            Success s -> return s
-            Error err -> putStrLn err >> print songs >> return []
+            liftM parsePlaylist (responseBody res $$+- sinkParser json)
 
     songUrl tok x = do
         let url = "http://jing.fm/api/v1/media/song/surl"
@@ -148,21 +148,18 @@ createSession cmbt email pwd = do
     let hmap = HM.fromList $ responseHeaders res
         atoken = HM.lookup "Jing-A-Token-Header" hmap
         rtoken = HM.lookup "Jing-R-Token-Header" hmap
-    (Object hm) <- runResourceT $ responseBody res $$+- sinkParser json
-
-    case HM.lookup "result" hm of
-        Just (Object hm') -> do
-            let user = fromJust $ HM.lookup "usr" hm'
-                user' = fromJSON user :: Result Usr
-            case user' of
-                Success u -> do
-                    return $ Token <$> atoken
+        parseToken :: Value -> Maybe (Radio.Param Jing)
+        parseToken (Object hm) = do
+            let user = HM.lookup "result" hm >>= 
+                       \(Object hm') -> HM.lookup "usr" hm'
+            case fromJSON $ fromMaybe Null user of
+                Success u -> Token <$> atoken
                                    <*> rtoken
                                    <*> (Just $ C.pack $ show $ userid u)
                                    <*> (Just $ usernick u)
                                    <*> Just cmbt
-                Error err -> putStrLn err >> print user >> return Nothing
-        _         -> return Nothing
+                Error err -> Nothing
+    liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
 
 saveToken :: Radio.Param Jing -> IO ()
 saveToken tok = do

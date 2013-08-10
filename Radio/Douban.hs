@@ -12,7 +12,7 @@ import           Data.Char (isDigit)
 import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.HashMap.Strict as HM
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Network.HTTP.Conduit
 import           Network.HTTP.Types (urlEncode, renderQuery, Query)
@@ -66,16 +66,9 @@ getPlaylist' query = do
     let req = initReq { method = "GET"
                       , queryString = renderQuery False query
                       }
-    (Object hm) <- withManager $ \manager -> do
+    withManager $ \manager -> do
         res <- http req manager
-        responseBody res $$+- sinkParser json
-
-    -- TODO: those without ssid filed are ads, filter them out!
-    let songs = fromJust $ HM.lookup "song" hm
-        pls = fromJSON songs :: Result [Douban]
-    case pls of
-        Success s -> return s
-        Error err -> putStrLn err >> print songs >> return []
+        liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
 
 musicianID :: String -> IO (Maybe String)
 musicianID name = do
@@ -90,6 +83,13 @@ musicianID name = do
 
 instance Radio.Radio Douban  where
     data Param Douban = Cid Int | Musician String
+
+    -- TODO: those without ssid filed are ads, filter them out!
+    parsePlaylist (Object hm) = do
+        let songs = HM.lookup "song" hm
+        case fromJSON $ fromMaybe Null songs of
+             Success s -> s
+             Error err -> []
 
     getPlaylist (Cid cid) = do
         let query = [ ("type", Just "n")
@@ -189,5 +189,3 @@ search' url = do
     case channels of
         Success c -> return c
         Error err -> putStrLn err >> print resData >> return []
-
-

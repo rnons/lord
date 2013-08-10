@@ -7,13 +7,13 @@ import           Control.Concurrent.MVar
 import           Control.Concurrent (forkIO, threadDelay)
 import qualified Control.Exception as E
 import           Control.Monad (unless)
-import           Data.Aeson (FromJSON)
+import           Data.Aeson (FromJSON, Value)
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
 import           ID3.Simple
 import           ID3.Type.Tag (emptyID3Tag)
 import           Network.HTTP.Conduit
-import           Network.MPD hiding (play)
+import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -28,6 +28,8 @@ data SongMeta = SongMeta
 
 class FromJSON a => Radio a where
     data Param a :: *
+
+    parsePlaylist :: Value -> [a]
 
     getPlaylist :: Param a -> IO [a]
 
