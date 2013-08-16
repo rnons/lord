@@ -163,7 +163,7 @@ createSession cmbt email pwd = do
 
 saveToken :: Radio.Param Jing -> IO ()
 saveToken tok = do
-    home <- Radio.getRadioDir
+    home <- getRadioDir
     writeFile (home ++ "/lord.cfg") $ pprToken tok
     putStrLn "Your token has been saved to ~/lord.cfg"
 

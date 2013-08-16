@@ -5,9 +5,12 @@ import Options.Applicative
 import Radio
 import Radio.Douban
 import Radio.Jing
+import Data.Default (def)
+import System.Posix.Daemon
 
 data Options = Options
     { optCommand    :: Command
+    , optDaemon     :: Bool
     } deriving (Eq, Show)
 
 data Command = DoubanRadio DoubanSubCommand
@@ -31,19 +34,22 @@ optParser = Options
                  <> command "jing"         (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
                   )
+    <*> switch (long "no-daemon" <> help "don't detach from console")
 
 main :: IO ()
 main = do
+    home <- getRadioDir
+    let pid = home ++ "/lord.pid"
     o <- execParser $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
     case optCommand o of
         DoubanRadio subCommand -> 
             case subCommand of
-                 DoubanListen param -> doubanListen param
+                 DoubanListen param -> listen (optDaemon o) pid doubanListen param
                  DoubanHot -> doubanHot
                  DoubanTrending -> doubanTrending
                  DoubanSearch param -> doubanSearch param
-        JingRadio (JingListen param) -> jingListen param
+        JingRadio (JingListen param) -> listen (optDaemon o) pid jingListen param
 
 doubanOptions :: Parser Command
 doubanOptions = DoubanRadio <$> 
@@ -104,4 +110,9 @@ jingListen p = do
         _         -> do
             mtok <- login p
             play mtok []
+
+listen :: Bool -> FilePath -> (String -> IO ()) -> String -> IO ()
+listen nodaemon pid f =
+    if nodaemon then f
+                else runDetached (Just pid) def . f
 
