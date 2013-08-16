@@ -1,10 +1,12 @@
-import Control.Monad (when)
+import           Control.Monad (when)
 import qualified Data.ByteString.Char8 as C
-import Data.Char (isDigit)
-import Data.Default (def)
-import Network.MPD (withMPD, clear)
-import Options.Applicative
-import System.Posix.Daemon
+import           Data.Char (isDigit)
+import           Data.Default (def)
+import           Network.MPD (withMPD, clear)
+import           Options.Applicative
+import           System.IO (openFile, IOMode(AppendMode), stdout)
+import           System.Log.FastLogger (mkLogger, Logger)
+import           System.Posix.Daemon
 
 import Radio
 import Radio.Douban
@@ -46,14 +48,17 @@ main = do
     pid <- getPid
     o <- execParser $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
+    logger <- if optDaemon o then mkLogger True stdout 
+                             else getLogFile >>= 
+                                  flip openFile AppendMode >>= mkLogger True
     case optCommand o of
         DoubanRadio subCommand -> 
             case subCommand of
-                 DoubanListen param -> listen (optDaemon o) pid doubanListen param
+                 DoubanListen param -> doubanListen logger (optDaemon o) pid param
                  DoubanHot -> doubanHot
                  DoubanTrending -> doubanTrending
                  DoubanSearch param -> doubanSearch param
-        JingRadio (JingListen param) -> jingListen (optDaemon o) pid param
+        JingRadio (JingListen param) -> jingListen logger (optDaemon o) pid param
         Kill -> killLord
 
 doubanOptions :: Parser Command
@@ -89,12 +94,18 @@ jingListenOptions =
     helper <*> 
     ( JingListen <$> argument str (metavar "KEYWORDS") )
 
-doubanListen :: String -> IO ()
-doubanListen p 
-    | isChId p = play (Cid $ read p) []
-    | otherwise = play (Musician p) []
+doubanListen :: Logger -> Bool -> FilePath -> String -> IO ()
+doubanListen logger nodaemon pid p =
+    if nodaemon then listen
+                else do
+                    running <- isRunning pid
+                    when running $ killAndWait pid 
+                    runDetached (Just pid) def listen
   where
     isChId = and . fmap isDigit
+    listen
+        | isChId p = play logger (Cid $ read p) []
+        | otherwise = play logger (Musician p) []
 
 doubanHot :: IO ()
 doubanHot = hot >>= pprChannels
@@ -105,8 +116,8 @@ doubanTrending = trending >>= pprChannels
 doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
 
-jingListen :: Bool -> FilePath -> String -> IO ()
-jingListen nodaemon pid p = do
+jingListen :: Logger -> Bool -> FilePath -> String -> IO ()
+jingListen logger nodaemon pid p = do
     tok <- readToken p
     case tok of
         Just tok' -> do
@@ -117,11 +128,11 @@ jingListen nodaemon pid p = do
             play' mtok
   where
     play' tok =
-        if nodaemon then play tok []
+        if nodaemon then play logger tok []
                     else do
                         running <- isRunning pid
                         when running $ killAndWait pid 
-                        runDetached (Just pid) def (play tok [])
+                        runDetached (Just pid) def (play logger tok [])
 
 listen :: Bool -> FilePath -> (String -> IO ()) -> String -> IO ()
 listen nodaemon pid f p =
@@ -138,3 +149,8 @@ getPid :: IO FilePath
 getPid = do
     home <- getRadioDir
     return $ home ++ "/lord.pid"
+
+getLogFile :: IO FilePath
+getLogFile = do
+    home <- getRadioDir
+    return $ home ++ "/lord.log"

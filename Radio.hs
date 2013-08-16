@@ -3,6 +3,7 @@
 
 module Radio where
 
+import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Concurrent.MVar
 import           Control.Concurrent (forkIO, threadDelay)
 import qualified Control.Exception as E
@@ -16,7 +17,10 @@ import           Network.HTTP.Conduit
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
+import           System.IO (openFile, IOMode(AppendMode))
 import           System.IO.Unsafe (unsafePerformIO)
+import           System.Log.FastLogger
+import           System.Log.FastLogger.Date (ZonedDate)
 
 downloaded = unsafePerformIO newEmptyMVar
 
@@ -39,9 +43,9 @@ class FromJSON a => Radio a where
 
     tagged :: a -> Bool
 
-    play :: Param a -> [a] -> IO ()
-    play reqData [] = getPlaylist reqData >>= play reqData
-    play reqData (x:xs) = do
+    play :: Logger -> Param a -> [a] -> IO ()
+    play logger reqData [] = getPlaylist reqData >>= play logger reqData
+    play logger reqData (x:xs) = do
         surl <- songUrl reqData x
         print surl
         req <- parseUrl surl
@@ -54,8 +58,7 @@ class FromJSON a => Radio a where
                     responseBody res $$+- sinkFile (home ++ "/radio.m4a")
                 -- This will block until downloaded.
 
-                putStrLn (artist $ songMeta x)
-                putStrLn (title $ songMeta x)
+                writeLog logger $ artist (songMeta x) ++ " - " ++ title (songMeta x)
                 
                 -- writeTag after downloaded to avoid file handle race.
                 unless (tagged x) $ do
@@ -72,14 +75,15 @@ class FromJSON a => Radio a where
 
                 putMVar downloaded ())
             (\e -> do
-                print (e :: HttpException)
-                Radio.play reqData xs
+                print (e :: E.SomeException)
+                writeLog logger $ show e
+                play logger reqData xs
                 )
                 
         --mtid <- newMVar threadId
         threadDelay 3000000
         mpdLoad
-        play reqData xs
+        play logger reqData xs
 
 mpdLoad :: IO ()
 mpdLoad = do
@@ -116,3 +120,16 @@ getRadioDir :: IO FilePath
 getRadioDir = do
    home <- getHomeDirectory
    return $ home ++ "/.lord"
+
+formatLogMessage :: IO ZonedDate -> String -> IO [LogStr]
+formatLogMessage getdate msg = do
+    now <- getdate
+    return 
+        [ LB now
+        , LB " : "
+        , LS $ encodeString msg
+        , LB "\n"
+        ]
+
+writeLog :: Logger -> String -> IO ()
+writeLog l msg = formatLogMessage (loggerDate l) msg >>= loggerPutStr l
