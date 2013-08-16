@@ -116,4 +116,3 @@ getRadioDir :: IO FilePath
 getRadioDir = do
    home <- getHomeDirectory
    return $ home ++ "/.lord"
-

@@ -1,12 +1,14 @@
+import Control.Monad (when)
 import qualified Data.ByteString.Char8 as C
 import Data.Char (isDigit)
+import Data.Default (def)
+import Network.MPD (withMPD, clear)
 import Options.Applicative
+import System.Posix.Daemon
 
 import Radio
 import Radio.Douban
 import Radio.Jing
-import Data.Default (def)
-import System.Posix.Daemon
 
 data Options = Options
     { optCommand    :: Command
@@ -15,6 +17,7 @@ data Options = Options
 
 data Command = DoubanRadio DoubanSubCommand
              | JingRadio JingSubCommand
+             | Kill
     deriving (Eq, Show)
 
 data DoubanSubCommand = DoubanListen String
@@ -29,17 +32,18 @@ data JingSubCommand = JingListen String
 
 optParser :: Parser Options
 optParser = Options 
-    <$> subparser ( command "douban"       (info (helper <*> doubanOptions)
+    <$> subparser ( command "douban"        (info (helper <*> doubanOptions)
                         (progDesc "douban.fm commander"))
-                 <> command "jing"         (info (helper <*> jingOptions)
+                 <> command "jing"          (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
+                 <> command "kill"          (info (pure Kill)
+                        (progDesc "kill the current running lord session"))
                   )
     <*> switch (long "no-daemon" <> help "don't detach from console")
 
 main :: IO ()
 main = do
-    home <- getRadioDir
-    let pid = home ++ "/lord.pid"
+    pid <- getPid
     o <- execParser $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
     case optCommand o of
@@ -49,7 +53,8 @@ main = do
                  DoubanHot -> doubanHot
                  DoubanTrending -> doubanTrending
                  DoubanSearch param -> doubanSearch param
-        JingRadio (JingListen param) -> listen (optDaemon o) pid jingListen param
+        JingRadio (JingListen param) -> jingListen (optDaemon o) pid param
+        Kill -> killLord
 
 doubanOptions :: Parser Command
 doubanOptions = DoubanRadio <$> 
@@ -100,19 +105,36 @@ doubanTrending = trending >>= pprChannels
 doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
 
-jingListen :: String -> IO ()
-jingListen p = do
+jingListen :: Bool -> FilePath -> String -> IO ()
+jingListen nodaemon pid p = do
     tok <- readToken p
     case tok of
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
-            play tok' []
+            play' tok'
         _         -> do
             mtok <- login p
-            play mtok []
+            play' mtok
+  where
+    play' tok =
+        if nodaemon then play tok []
+                    else do
+                        running <- isRunning pid
+                        when running $ killAndWait pid 
+                        runDetached (Just pid) def (play tok [])
 
 listen :: Bool -> FilePath -> (String -> IO ()) -> String -> IO ()
-listen nodaemon pid f =
-    if nodaemon then f
-                else runDetached (Just pid) def . f
+listen nodaemon pid f p =
+    if nodaemon then f p
+                else do
+                    running <- isRunning pid
+                    when running $ killAndWait pid 
+                    runDetached (Just pid) def (f p)
 
+killLord :: IO ()
+killLord = withMPD clear >> getPid >>= kill
+
+getPid :: IO FilePath
+getPid = do
+    home <- getRadioDir
+    return $ home ++ "/lord.pid"
