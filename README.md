@@ -28,11 +28,11 @@ MPD有两大优势：占用资源小；客户端丰富。[MPD客户端]有图形
 
 ```
 lord -h
-lord douban listen [<channel_id> | <musician>]
+lord douban listen [<channel_id> | <musician>] [--no-daemon]
 lord douban search <keywords>
 lord douban hot
 lord douban trending
-lord jing listen <keywords>
+lord jing listen <keywords> [--no-daemon]
 ```
 
 lord的操作方式非常简单，稍微需要注意的是
@@ -42,7 +42,8 @@ lord的操作方式非常简单，稍微需要注意的是
         lord douban listen 1002316
         lord douban listen "Sigur Ros"
 
-- 收听jing.fm时，需要登录，登录成功后，token会被保存到`~/.lord/lord.cfg`文件里，这样就不用每次都登录。这个token不是你的用户名、密码，它的有效期只有一至两周。所以如果在收听一段时间后突然无法收听，则需要手动删除`~/.lord/lord.cfg`文件，然后lord会提示重新登录。
+- 收听jing.fm时，需要登录，登录成功后，token会被保存到`~/.lord/lord.yml`文件里，这样就不用每次都登录。这个token不是你的用户名、密码，它的有效期只有一至两周。所以如果在收听一段时间后突然无法收听，则需要手动删除`~/.lord/lord.yml`文件，然后lord会提示重新登录。
+- 如果网络条件不好可以编辑`~/.lord/lord.yml`文件，将highquality的值设为false，收听普通音质。
 
 ## 故障排除
 
@@ -64,8 +65,6 @@ Decoders plugins:
 **注**: Arch Linux没有这个问题。douban.fm不受这个问题影响。
 
 **再注**: 遇到问题时，可以通过`mpd --no-daemon --stdout`在前台运行mpd。提交bug时，也请把stdout的输出信息附上。
-
-
 
 ## 觉得MPD配置太麻烦？
 

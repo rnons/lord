@@ -1,5 +1,5 @@
 name:                lord
-version:             2013.7.24
+version:             2013.8.24
 synopsis:            Lord of radio daemon
 description:         A unified interface to online radio service provider, use mpd as backend.
 homepage:            https://github.com/rnons/lord
@@ -43,7 +43,8 @@ executable lord
                         transformers >= 0.3, 
                         unordered-containers >= 0.2, 
                         utf8-string >= 0.3, 
-                        xml-conduit >= 1.1
+                        xml-conduit >= 1.1,
+                        yaml >= 0.8
 
 test-suite test
   type:                 exitcode-stdio-1.0
@@ -74,4 +75,5 @@ test-suite test
                         transformers >= 0.3, 
                         unordered-containers >= 0.2, 
                         utf8-string >= 0.3, 
-                        xml-conduit >= 1.1
+                        xml-conduit >= 1.1,
+                        yaml >= 0.8

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Radio.Jing where
 
@@ -10,10 +11,10 @@ import           Codec.Binary.UTF8.String (encodeString)
 import           Data.Aeson
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
-import qualified Data.Configurator as CF
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
+import           Data.Yaml
 import           GHC.Generics (Generic)
 import           Data.CaseInsensitive (mk)
 import           Data.Conduit (runResourceT, ($$+-))
@@ -56,26 +57,28 @@ instance FromJSON Usr where
 
 instance Radio.Radio Jing where
     data Param Jing = Token
-        { aToken    :: ByteString
-        , rToken    :: ByteString
-        , uid       :: ByteString
-        , nick      :: ByteString 
-        , cmbt      :: String
-        } deriving (Show)
+        { aToken        :: ByteString
+        , rToken        :: ByteString
+        , uid           :: Int
+        , nick          :: ByteString 
+        , cmbt          :: String
+        , highquality   :: Bool
+        } deriving (Show, Generic)
 
     parsePlaylist (Object hm) = do
         let songs = HM.lookup "result" hm >>= 
                     \(Object hm') -> HM.lookup "items" hm'
         case fromJSON $ fromMaybe Null songs of
             Success s -> s
-            Error err -> []
+            Error err -> error $ "Parse playlist failed: " ++ show err
+    parsePlaylist _ = error "Unrecognized playlist format."
 
     getPlaylist tok = do
         let url = "http://jing.fm/api/v1/search/jing/fetch_pls"
             query = [ ("q", C.pack $ encodeString $ cmbt tok)
-                    , ("ps", "5")
+                    , ("ps", "10")
                     , ("st", "0")
-                    , ("u", uid tok)
+                    , ("u", C.pack $ show $ uid tok)
                     , ("tid", "0")
                     , ("mt", "")
                     , ("ss", "true")
@@ -95,7 +98,8 @@ instance Radio.Radio Jing where
 
     songUrl tok x = do
         let url = "http://jing.fm/api/v1/media/song/surl"
-            query = [ ("type", Just "NO")
+            type_ = if highquality tok then "NO" else "MM"
+            query = [ ("type", Just type_)
                     , ("mid", Just $ mid x)
                     ] :: Query
             aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
@@ -117,8 +121,11 @@ instance Radio.Radio Jing where
     -- Songs from jing.fm comes with tags!
     tagged _ = True
 
+instance FromJSON (Radio.Param Jing)
+instance ToJSON (Radio.Param Jing)
+
 login :: String -> IO (Radio.Param Jing)
-login cmbt = do
+login keywords = do
     hSetBuffering stdout NoBuffering
     hSetEcho stdin True 
     putStrLn "Please Log in"
@@ -129,17 +136,17 @@ login cmbt = do
     pwd <- getLine
     hSetEcho stdin True 
     putStrLn ""
-    mtoken <- createSession cmbt email pwd
+    mtoken <- createSession keywords email pwd
     case mtoken of
          Just tok -> do
              saveToken tok
              return tok
          Nothing  -> do
              putStrLn "ERROR: Invalid email or password!"
-             login cmbt
+             login keywords
 
 createSession :: String -> String -> String -> IO (Maybe (Radio.Param Jing))
-createSession cmbt email pwd = do
+createSession keywords email pwd = do
     let url = "http://jing.fm/api/v1/sessions/create"
         query = [ ("email", C.pack email) , ("pwd", C.pack pwd) ]
     req <- parseUrl url
@@ -155,42 +162,33 @@ createSession cmbt email pwd = do
             case fromJSON $ fromMaybe Null user of
                 Success u -> Token <$> atoken
                                    <*> rtoken
-                                   <*> (Just $ C.pack $ show $ userid u)
+                                   <*> (Just $ userid u)
                                    <*> (Just $ usernick u)
-                                   <*> Just cmbt
-                Error err -> Nothing
+                                   <*> Just keywords
+                                   <*> Just True
+                Error err -> error $ "Retrieve token failed: " ++ show err
+        parseToken _ = error "Unrecognized token format."
     liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
 
 saveToken :: Radio.Param Jing -> IO ()
 saveToken tok = do
     home <- getRadioDir
-    writeFile (home ++ "/lord.cfg") $ pprToken tok
-    putStrLn "Your token has been saved to ~/lord.cfg"
-
-pprToken :: Radio.Param Jing -> String
-pprToken tok = unlines [ "token"
-                       , "{"
-                       , "    atoken = \"" ++ C.unpack (aToken tok) ++ "\""
-                       , "    rtoken = \"" ++ C.unpack (rToken tok) ++ "\""
-                       , "    uid    = \"" ++ C.unpack (uid tok) ++ "\""
-                       , "    nick   = \"" ++ C.unpack (nick tok) ++ "\""
-                       , "}" ]
+    let yml = home ++ "/lord.yml"
+    encodeFile yml tok
+    putStrLn "Your token has been saved to ~/lord.yml"
 
 readToken :: String -> IO (Maybe (Radio.Param Jing))
-readToken cmbt = do
+readToken keywords = do
     home <- Radio.getRadioDir
-    let path = home ++ "/lord.cfg"
-    exist <- doesFileExist path
+    let yml = home ++ "/lord.yml"
+    exist <- doesFileExist yml
     if exist
        then do
-            conf <- CF.load [ CF.Required path ]
-            atoken <- CF.lookup conf "token.atoken" :: IO (Maybe ByteString)
-            rtoken <- CF.lookup conf "token.rtoken" :: IO (Maybe ByteString)
-            uid <- CF.lookup conf "token.uid" :: IO (Maybe ByteString)
-            nick <- CF.lookup conf "token.nick" :: IO (Maybe ByteString)
-            return $ Token <$> atoken 
-                           <*> rtoken 
-                           <*> uid 
-                           <*> nick 
-                           <*> Just cmbt
+            conf <- decodeFile yml
+            case conf of
+                Nothing -> error $ "Invalid YAML file: " ++ show conf
+                Just c -> 
+                    case fromJSON c of
+                        Success tok -> return $ Just $ tok { cmbt = keywords }
+                        Error err -> error $ "Parse token failed: " ++ show err
        else return Nothing

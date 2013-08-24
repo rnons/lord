@@ -134,14 +134,6 @@ jingListen logger nodaemon pid p = do
                         when running $ killAndWait pid 
                         runDetached (Just pid) def (play logger tok [])
 
-listen :: Bool -> FilePath -> (String -> IO ()) -> String -> IO ()
-listen nodaemon pid f p =
-    if nodaemon then f p
-                else do
-                    running <- isRunning pid
-                    when running $ killAndWait pid 
-                    runDetached (Just pid) def (f p)
-
 killLord :: IO ()
 killLord = withMPD clear >> getPid >>= kill
 
