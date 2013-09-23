@@ -9,6 +9,7 @@ import           System.Log.FastLogger (mkLogger, Logger)
 import           System.Posix.Daemon
 
 import Radio
+import Radio.Cmd
 import Radio.Douban
 import Radio.Jing
 
@@ -17,9 +18,13 @@ data Options = Options
     , optDaemon     :: Bool
     } deriving (Eq, Show)
 
-data Command = DoubanRadio DoubanSubCommand
-             | JingRadio JingSubCommand
+data Command = CmdFM CmdSubCommand
+             | DoubanFM DoubanSubCommand
+             | JingFM JingSubCommand
              | Kill
+    deriving (Eq, Show)
+
+data CmdSubCommand = CmdListen String
     deriving (Eq, Show)
 
 data DoubanSubCommand = DoubanListen String
@@ -34,7 +39,9 @@ data JingSubCommand = JingListen String
 
 optParser :: Parser Options
 optParser = Options 
-    <$> subparser ( command "douban"        (info (helper <*> doubanOptions)
+    <$> subparser ( command "cmd"           (info (helper <*> cmdOptions)
+                        (progDesc "cmd.fm commander"))
+                 <> command "douban"        (info (helper <*> doubanOptions)
                         (progDesc "douban.fm commander"))
                  <> command "jing"          (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
@@ -52,17 +59,30 @@ main = do
                              else getLogFile >>= 
                                   flip openFile AppendMode >>= mkLogger True
     case optCommand o of
-        DoubanRadio subCommand -> 
+        CmdFM subCommand ->
+            case subCommand of
+                CmdListen genre -> cmdListen logger (optDaemon o) pid genre
+        DoubanFM subCommand -> 
             case subCommand of
                  DoubanListen param -> doubanListen logger (optDaemon o) pid param
                  DoubanHot -> doubanHot
                  DoubanTrending -> doubanTrending
                  DoubanSearch param -> doubanSearch param
-        JingRadio (JingListen param) -> jingListen logger (optDaemon o) pid param
+        JingFM (JingListen param) -> jingListen logger (optDaemon o) pid param
         Kill -> killLord
 
+cmdOptions :: Parser Command
+cmdOptions = CmdFM <$> subparser
+    ( command "listen" (info cmdListenOptions
+        (progDesc "Provide genre to listen to cmd.fm"))
+    )
+
+cmdListenOptions :: Parser CmdSubCommand
+cmdListenOptions = helper <*>
+    ( CmdListen <$> argument str (metavar "GENRE") )
+
 doubanOptions :: Parser Command
-doubanOptions = DoubanRadio <$> 
+doubanOptions = DoubanFM <$> 
                    subparser ( command "listen" (info doubanListenOptions
                                     (progDesc "Provide cid/musician to listen to douban.fm"))
                             <> command "search" (info doubanSearchOptions
@@ -84,15 +104,24 @@ doubanSearchOptions =
     ( DoubanSearch <$> argument str (metavar "KEYWORDS") )
 
 jingOptions :: Parser Command
-jingOptions = JingRadio <$> 
-                 subparser ( command "listen" (info jingListenOptions
-                                 (progDesc "Provide keywords to listen to jing.fm"))
-                           )
+jingOptions = JingFM <$> subparser 
+    ( command "listen" (info jingListenOptions
+        (progDesc "Provide keywords to listen to jing.fm"))
+    )
 
 jingListenOptions :: Parser JingSubCommand
-jingListenOptions = 
-    helper <*> 
+jingListenOptions = helper <*> 
     ( JingListen <$> argument str (metavar "KEYWORDS") )
+
+cmdListen :: Logger -> Bool -> FilePath -> String -> IO ()
+cmdListen logger nodaemon pid p =
+    if nodaemon then listen
+                else do
+                    running <- isRunning pid
+                    when running $ killAndWait pid 
+                    runDetached (Just pid) def listen
+  where
+    listen = play logger (Genre p) []
 
 doubanListen :: Logger -> Bool -> FilePath -> String -> IO ()
 doubanListen logger nodaemon pid p =
