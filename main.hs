@@ -25,6 +25,7 @@ data Command = CmdFM CmdSubCommand
     deriving (Eq, Show)
 
 data CmdSubCommand = CmdListen String
+                   | CmdGenreList
     deriving (Eq, Show)
 
 data DoubanSubCommand = DoubanListen String
@@ -36,6 +37,7 @@ data DoubanSubCommand = DoubanListen String
 data JingSubCommand = JingListen String
     deriving (Eq, Show)
 
+type Keywords = String
 
 optParser :: Parser Options
 optParser = Options 
@@ -52,29 +54,28 @@ optParser = Options
 
 main :: IO ()
 main = do
-    pid <- getPid
     o <- execParser $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
-    logger <- if optDaemon o then mkLogger True stdout 
-                             else getLogFile >>= 
-                                  flip openFile AppendMode >>= mkLogger True
     case optCommand o of
         CmdFM subCommand ->
             case subCommand of
-                CmdListen genre -> cmdListen logger (optDaemon o) pid genre
+                CmdListen genre   -> listen (cmdListen genre) (optDaemon o)
+                CmdGenreList      -> cmdGenres
         DoubanFM subCommand -> 
             case subCommand of
-                 DoubanListen param -> doubanListen logger (optDaemon o) pid param
-                 DoubanHot -> doubanHot
-                 DoubanTrending -> doubanTrending
-                 DoubanSearch param -> doubanSearch param
-        JingFM (JingListen param) -> jingListen logger (optDaemon o) pid param
+                 DoubanListen key -> listen (doubanListen key) (optDaemon o)
+                 DoubanHot        -> doubanHot
+                 DoubanTrending   -> doubanTrending
+                 DoubanSearch key -> doubanSearch key
+        JingFM (JingListen key) -> jingListen key (optDaemon o)
         Kill -> killLord
 
 cmdOptions :: Parser Command
 cmdOptions = CmdFM <$> subparser
     ( command "listen" (info cmdListenOptions
         (progDesc "Provide genre to listen to cmd.fm"))
+    <> command "genres" (info (pure CmdGenreList)
+        (progDesc "List available genres"))
     )
 
 cmdListenOptions :: Parser CmdSubCommand
@@ -82,25 +83,23 @@ cmdListenOptions = helper <*>
     ( CmdListen <$> argument str (metavar "GENRE") )
 
 doubanOptions :: Parser Command
-doubanOptions = DoubanFM <$> 
-                   subparser ( command "listen" (info doubanListenOptions
-                                    (progDesc "Provide cid/musician to listen to douban.fm"))
-                            <> command "search" (info doubanSearchOptions
-                                    (progDesc "search channels"))
-                            <> command "hot" (info (pure DoubanHot)
-                                    (progDesc "hot channels"))
-                            <> command "trending" (info (pure DoubanTrending)
-                                    (progDesc "trending up channels"))
-                             )
+doubanOptions = DoubanFM <$> subparser 
+    ( command "listen" (info doubanListenOptions
+        (progDesc "Provide cid/musician to listen to douban.fm"))
+    <> command "search" (info doubanSearchOptions
+        (progDesc "search channels"))
+    <> command "hot" (info (pure DoubanHot)
+        (progDesc "hot channels"))
+    <> command "trending" (info (pure DoubanTrending)
+        (progDesc "trending up channels"))
+    )
 
 doubanListenOptions :: Parser DoubanSubCommand
-doubanListenOptions = 
-    helper <*> 
+doubanListenOptions = helper <*> 
     ( DoubanListen <$> argument str (metavar "[<channel_id> | <musician>]") )
 
 doubanSearchOptions :: Parser DoubanSubCommand
-doubanSearchOptions = 
-    helper <*> 
+doubanSearchOptions = helper <*> 
     ( DoubanSearch <$> argument str (metavar "KEYWORDS") )
 
 jingOptions :: Parser Command
@@ -113,28 +112,30 @@ jingListenOptions :: Parser JingSubCommand
 jingListenOptions = helper <*> 
     ( JingListen <$> argument str (metavar "KEYWORDS") )
 
-cmdListen :: Logger -> Bool -> FilePath -> String -> IO ()
-cmdListen logger nodaemon pid p =
-    if nodaemon then listen
-                else do
-                    running <- isRunning pid
-                    when running $ killAndWait pid 
-                    runDetached (Just pid) def listen
-  where
-    listen = play logger (Genre p) []
+cmdListen :: Keywords -> Radio.Param Cmd
+cmdListen = Genre
 
-doubanListen :: Logger -> Bool -> FilePath -> String -> IO ()
-doubanListen logger nodaemon pid p =
-    if nodaemon then listen
-                else do
-                    running <- isRunning pid
-                    when running $ killAndWait pid 
-                    runDetached (Just pid) def listen
+doubanListen :: Keywords -> Radio.Param Douban
+doubanListen k
+    | isChId k = Cid $ read k
+    | otherwise = Musician k
   where
     isChId = and . fmap isDigit
-    listen
-        | isChId p = play logger (Cid $ read p) []
-        | otherwise = play logger (Musician p) []
+
+listen :: Radio a => Radio.Param a -> Bool -> IO ()
+listen param nodaemon = do
+    pid <- getPid
+    logger <- if nodaemon then mkLogger True stdout 
+              else getLogFile >>= flip openFile AppendMode >>= mkLogger True
+    let listen = play logger param []
+    if nodaemon then listen
+                else do
+                    running <- isRunning pid
+                    when running $ killAndWait pid 
+                    runDetached (Just pid) def listen
+
+cmdGenres :: IO ()
+cmdGenres = genres >>= pprGenres
 
 doubanHot :: IO ()
 doubanHot = hot >>= pprChannels
@@ -145,23 +146,25 @@ doubanTrending = trending >>= pprChannels
 doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
 
-jingListen :: Logger -> Bool -> FilePath -> String -> IO ()
-jingListen logger nodaemon pid p = do
-    tok <- readToken p
+jingListen :: Keywords -> Bool -> IO ()
+jingListen k nodaemon = do
+    pid <- getPid
+    logger <- if nodaemon then mkLogger True stdout 
+              else getLogFile >>= flip openFile AppendMode >>= mkLogger True
+    let play' tok =
+            if nodaemon then play logger tok []
+            else do
+                running <- isRunning pid
+                when running $ killAndWait pid 
+                runDetached (Just pid) def (play logger tok [])
+    tok <- readToken k
     case tok of
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
             play' tok'
         _         -> do
-            mtok <- login p
+            mtok <- login k
             play' mtok
-  where
-    play' tok =
-        if nodaemon then play logger tok []
-                    else do
-                        running <- isRunning pid
-                        when running $ killAndWait pid 
-                        runDetached (Just pid) def (play logger tok [])
 
 killLord :: IO ()
 killLord = withMPD clear >> getPid >>= kill

@@ -1,22 +1,19 @@
 -- | Module of http://cmd.fm
 
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 module Radio.Cmd where
 
 import qualified Control.Exception as E
 import           Control.Monad (liftM)
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as C
-import           Data.Conduit (runResourceT, ($$+-))
+import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.HashMap.Strict as HM
+import           Data.List (intercalate)
+import           Data.Maybe (fromMaybe)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Conduit
-import           Network.HTTP.Types 
+import           Network.HTTP.Types (renderQuery)
 import           Network.HTTP.Types.Header (hLocation)
 import           Network.HTTP.Types.Status (status302)
 
@@ -82,4 +79,15 @@ instance Radio.Radio Cmd where
 
     tagged _ = False
 
-            
+genres :: IO [String]
+genres = do 
+    res <- simpleHttp "http://cmd.fm/get.php?genres=1"
+    return $ fromMaybe [] (decode res :: Maybe [String])
+
+pprGenres :: [String] -> IO ()
+pprGenres [] = return ()
+pprGenres gs = do
+    putStrLn $ foldr1 f (take 3 gs)
+    pprGenres $ drop 3 gs
+  where
+    f a b = a ++ (concat $ take (30 - length(a)) $ repeat " ") ++ b
