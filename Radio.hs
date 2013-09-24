@@ -1,28 +1,21 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
+-- | A generic interface to online radio services
 
 module Radio where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Concurrent.MVar
-import           Control.Concurrent (forkIO, threadDelay)
-import qualified Control.Exception as E
-import           Control.Monad (unless)
+import           Control.Concurrent (forkIO)
 import           Data.Aeson (FromJSON, Value)
+import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
-import           Data.Conduit.Binary (sinkFile)
-import           ID3.Simple
-import           ID3.Type.Tag (emptyID3Tag)
-import           Network.HTTP.Conduit
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
-import           System.IO (openFile, IOMode(AppendMode))
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Log.FastLogger
 import           System.Log.FastLogger.Date (ZonedDate)
 
-downloaded = unsafePerformIO newEmptyMVar
+eof = unsafePerformIO newEmptyMVar
 
 data SongMeta = SongMeta 
     { artist    :: String
@@ -48,54 +41,18 @@ class FromJSON a => Radio a where
     play logger reqData (x:xs) = do
         surl <- songUrl reqData x
         print surl
-        req <- parseUrl surl
-        home <- getRadioDir
-        manager <- newManager def
-        threadId <- forkIO $ E.catch 
-            (do
-                runResourceT $ do 
-                    res <- http req manager
-                    responseBody res $$+- sinkFile (home ++ "/radio.m4a")
-                -- This will block until downloaded.
-
-                writeLog logger $ artist (songMeta x) ++ " - " ++ title (songMeta x)
-                
-                -- writeTag after downloaded to avoid file handle race.
-                unless (tagged x) $ do
-                    let meta = songMeta x
-                        tag = setArtist (artist meta) 
-                                $ setAlbum (album meta)
-                                $ setTitle (title meta)
-                                $ emptyID3Tag
-                    writeTag (home ++ "/radio.m4a") tag
-                    
-                    -- Update song info
-                    withMPD $ update [Path "lord"]
-                    return ()
-
-                putMVar downloaded ())
-            (\e -> do
-                print (e :: E.SomeException)
-                writeLog logger $ show e
-                play logger reqData xs
-                )
-                
-        --mtid <- newMVar threadId
-        threadDelay 3000000
-        mpdLoad
+        writeLog logger $ artist (songMeta x) ++ " - " ++ title (songMeta x)
+        mpdLoad $ Path $ C.pack surl
+        takeMVar eof                     -- Finished
         play logger reqData xs
 
-mpdLoad :: IO ()
-mpdLoad = do
+mpdLoad :: Path -> IO ()
+mpdLoad path = do
     s <- withMPD $ do
             clear
-            update [Path "lord"]
-            add "lord/radio.m4a"
-    case s of
-        Right _ -> do
-            withMPD $ MPD.play Nothing
-            mpdPlay
-        _                  -> mpdLoad
+            add path
+    withMPD $ MPD.play Nothing
+    mpdPlay
 
 mpdPlay :: IO ()
 mpdPlay = do
@@ -105,16 +62,9 @@ mpdPlay = do
     st <- withMPD status
     let st' = fmap stState st
     print st'
-    bd <- isEmptyMVar downloaded
     if st' == Right Stopped 
-        then if bd 
-                then do                                     -- Slow Network
-                    withMPD $ MPD.play Nothing
-                    mpdPlay
-                else do
-                    withMPD clear
-                    takeMVar downloaded                     -- Finished
-        else mpdPlay                                        -- Pause
+        then putMVar eof ()
+        else mpdPlay
 
 getRadioDir :: IO FilePath
 getRadioDir = do

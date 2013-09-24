@@ -21,6 +21,10 @@ executable lord
   main-is:              main.hs         
   -- other-modules:       
   ghc-options:          -Wall -fno-warn-unused-do-bind
+  extensions:           DeriveGeneric
+                        FlexibleInstances
+                        OverloadedStrings
+                        TypeFamilies
   build-depends:        base >= 4 && < 5, 
                         aeson >= 0.6, 
                         ansi-terminal >= 0.6, 
@@ -50,6 +54,10 @@ test-suite test
   type:                 exitcode-stdio-1.0
   main-is:              test/main.hs
   ghc-options:          -Wall -fno-warn-unused-do-bind
+  extensions:           DeriveGeneric
+                        FlexibleInstances
+                        OverloadedStrings
+                        TypeFamilies
   hs-source-dirs:       .
   build-depends:        base >= 4 && < 5,
                         aeson >= 0.6, 
