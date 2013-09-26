@@ -22,16 +22,19 @@ import qualified Radio
 type Param a = Radio.Param Cmd
 
 data Cmd = Cmd
-    { sc_id :: String
+    { sc_id :: Int
     , title :: String
     , artwork_url :: String
-    , duration      :: String
+    , description   :: String
+    , duration      :: Int
     , genre         :: String
     , tag_list      :: String
     , waveform_url  :: String
     , stream_url    :: String
-    , last_listened :: String
+    , last_listened :: Int
     , main_type     :: String
+    --, created_at    :: String
+    --, updated_at    :: String
     } deriving (Show, Generic)
 
 instance FromJSON Cmd
@@ -41,12 +44,13 @@ instance Radio.Radio Cmd where
 
     parsePlaylist val = do
         case fromJSON val of
-            Success s -> [s]
+            Success s -> s
             Error err -> error $ "Parse playlist failed: " ++ show err
 
     getPlaylist (Genre g) = do
-        let url = "http://cmd.fm/get.php"
-            query = [("genre", Just $ C.pack g)]
+        let url = "http://cmd.fm/api/tracks/search"
+            query = [ ("genre", Just $ C.pack g)
+                    , ("limit", Just $ C.pack "10") ]
         initReq <- parseUrl url
         let req = initReq { method = "GET"
                           , queryString = renderQuery False query
