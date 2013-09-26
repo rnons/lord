@@ -4,7 +4,7 @@ module Radio
   ( SongMeta(..)
   , Radio(..)
   , getLordDir
-  , getPid
+  , getPidFile
   , getLogFile
   , getStateFile
   , writeLog
@@ -83,8 +83,8 @@ mpdPlay = do
 getLordDir :: IO FilePath
 getLordDir = (++ "/.lord") <$> getHomeDirectory
 
-getPid :: IO FilePath
-getPid = (++ "/lord.pid") <$> getLordDir
+getPidFile :: IO FilePath
+getPidFile = (++ "/lord.pid") <$> getLordDir
 
 getLogFile :: IO FilePath
 getLogFile = (++ "/lord.log") <$> getLordDir

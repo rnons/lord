@@ -30,7 +30,7 @@ import           System.IO
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Directory (doesFileExist)
 
-import qualified Radio
+import Radio
 
 type Param a = Radio.Param Jing
 
@@ -146,9 +146,9 @@ instance Radio.Radio Jing where
                     responseBody res $$+- sinkFile (home ++ "/lord.m4a")
                 -- This will block until downloaded.
 
-                Radio.writeLog logger $ Radio.artist (Radio.songMeta x) 
-                                      ++ " - " 
-                                      ++ Radio.title (Radio.songMeta x)
+                let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
+                writeLog logger song 
+                getStateFile >>= flip writeFile song
 
                 putMVar downloaded ())
             (\e -> do

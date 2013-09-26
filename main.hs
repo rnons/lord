@@ -5,9 +5,13 @@ import           Data.Default (def)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Options.Applicative
 import           System.Directory (createDirectoryIfMissing)
-import           System.IO (openFile, IOMode(AppendMode), stdout)
+import           System.IO (openFile, IOMode(AppendMode), stdout, SeekMode(..))
 import           System.Log.FastLogger (mkLogger, Logger)
 import           System.Posix.Daemon
+import           System.Posix.Files (stdFileMode)
+import           System.Posix.IO ( fdWrite, createFile, setLock
+                                 , LockRequest(..) )
+import           System.Posix.Process (getProcessID)
 
 import Radio
 import Radio.Cmd
@@ -137,28 +141,41 @@ jingListen nodaemon k = do
         _         -> login k >>= listen nodaemon
 
 listen :: Radio a => Bool -> Radio.Param a -> IO ()
-listen nodaemon param= do
+listen nodaemon param = do
     -- Make sure ~/.lord exists
     getLordDir >>= createDirectoryIfMissing False
 
-    pid <- getPid
+    pid <- getPidFile
     logger <- if nodaemon then mkLogger True stdout 
               else getLogFile >>= flip openFile AppendMode >>= mkLogger True
-    let listen = play logger param []
-    if nodaemon then listen
-                else do
-                    running <- isRunning pid
-                    when running $ killAndWait pid 
-                    runDetached (Just pid) def listen
+    let listen' = play logger param []
+    running <- isRunning pid
+    when running $ killAndWait pid 
+    if nodaemon then runInForeground pid listen'
+                else runDetached (Just pid) def listen'
+
+-- Partially taken from System.Posix.Daemon module
+runInForeground :: FilePath -> IO () -> IO ()
+runInForeground pidFile program = do
+    fd <- createFile pidFile stdFileMode
+    setLock fd (WriteLock, AbsoluteSeek, 0, 0)
+    pid <- getProcessID
+    fdWrite fd (show pid)
+    program
 
 killLord :: IO ()
-killLord = withMPD clear >> getPid >>= kill
+killLord = withMPD clear >> getPidFile >>= kill
 
 lordStatus :: IO ()
 lordStatus = do
-    st <- fmap stState <$> withMPD status
-    let state = case st of
-            Right s  -> show s
-            Left err -> error $ show err
-    song <- getStateFile >>= readFile 
-    putStrLn $ "[" ++ state ++ "] " ++ song
+    running <- getPidFile >>= isRunning
+    status <- 
+        if running then do
+            st <- fmap stState <$> withMPD status
+            let state = case st of
+                    Right s  -> show s
+                    Left err -> error $ show err
+            song <- getStateFile >>= readFile 
+            return $ "[" ++ state ++ "] " ++ song
+        else return "Not running!"
+    putStrLn status
