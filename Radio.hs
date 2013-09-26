@@ -1,16 +1,27 @@
 -- | A generic interface to online radio services
 
-module Radio where
+module Radio
+  ( SongMeta(..)
+  , Radio(..)
+  , getLordDir
+  , getPid
+  , getLogFile
+  , getStateFile
+  , writeLog
+  ) where
 
 import           Codec.Binary.UTF8.String (encodeString)
+import           Control.Applicative ((<$>))
 import           Control.Concurrent.MVar
 import           Control.Concurrent (forkIO)
+import           Control.Monad (when)
 import           Data.Aeson (FromJSON, Value)
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
+import           System.IO (writeFile)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Log.FastLogger
 import           System.Log.FastLogger.Date (ZonedDate)
@@ -41,9 +52,12 @@ class FromJSON a => Radio a where
     play logger reqData (x:xs) = do
         surl <- songUrl reqData x
         print surl
-        writeLog logger $ artist (songMeta x) ++ " - " ++ title (songMeta x)
-        mpdLoad $ Path $ C.pack surl
-        takeMVar eof                     -- Finished
+        when (surl /= "") $ do
+            let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
+            writeLog logger song 
+            getStateFile >>= flip writeFile song
+            mpdLoad $ Path $ C.pack surl
+            takeMVar eof                     -- Finished
         play logger reqData xs
 
 mpdLoad :: Path -> IO ()
@@ -66,10 +80,17 @@ mpdPlay = do
         then putMVar eof ()
         else mpdPlay
 
-getRadioDir :: IO FilePath
-getRadioDir = do
-   home <- getHomeDirectory
-   return $ home ++ "/.lord"
+getLordDir :: IO FilePath
+getLordDir = (++ "/.lord") <$> getHomeDirectory
+
+getPid :: IO FilePath
+getPid = (++ "/lord.pid") <$> getLordDir
+
+getLogFile :: IO FilePath
+getLogFile = (++ "/lord.log") <$> getLordDir
+
+getStateFile :: IO FilePath
+getStateFile = (++ "/lordstate") <$> getLordDir
 
 formatLogMessage :: IO ZonedDate -> String -> IO [LogStr]
 formatLogMessage getdate msg = do

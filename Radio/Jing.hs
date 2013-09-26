@@ -137,7 +137,7 @@ instance Radio.Radio Jing where
         surl <- Radio.songUrl reqData x
         print surl
         req <- parseUrl surl
-        home <- Radio.getRadioDir
+        home <- Radio.getLordDir
         manager <- newManager def
         threadId <- forkIO $ E.catch 
             (do
@@ -163,7 +163,7 @@ instance Radio.Radio Jing where
 
 mpdLoad :: IO ()
 mpdLoad = do
-    --m4a <- (++ "/lord.m4a") <$> Radio.getRadioDir
+    --m4a <- (++ "/lord.m4a") <$> Radio.getLordDir
     let m4a = "lord/lord.m4a"
     s <- withMPD $ do
             clear
@@ -245,14 +245,14 @@ createSession keywords email pwd = do
 
 saveToken :: Radio.Param Jing -> IO ()
 saveToken tok = do
-    home <- Radio.getRadioDir
+    home <- Radio.getLordDir
     let yml = home ++ "/lord.yml"
     encodeFile yml tok
     putStrLn "Your token has been saved to ~/lord.yml"
 
 readToken :: String -> IO (Maybe (Radio.Param Jing))
 readToken keywords = do
-    home <- Radio.getRadioDir
+    home <- Radio.getLordDir
     let yml = home ++ "/lord.yml"
     exist <- doesFileExist yml
     if exist

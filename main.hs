@@ -2,8 +2,9 @@ import           Control.Monad (when)
 import qualified Data.ByteString.Char8 as C
 import           Data.Char (isDigit)
 import           Data.Default (def)
-import           Network.MPD (withMPD, clear)
+import           Network.MPD (withMPD, clear, status, stState)
 import           Options.Applicative
+import           System.Directory (createDirectoryIfMissing)
 import           System.IO (openFile, IOMode(AppendMode), stdout)
 import           System.Log.FastLogger (mkLogger, Logger)
 import           System.Posix.Daemon
@@ -21,6 +22,7 @@ data Options = Options
 data Command = CmdFM CmdSubCommand
              | DoubanFM DoubanSubCommand
              | JingFM JingSubCommand
+             | Status
              | Kill
     deriving (Eq, Show)
 
@@ -47,6 +49,8 @@ optParser = Options
                         (progDesc "douban.fm commander"))
                  <> command "jing"          (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
+                 <> command "status"        (info (pure Status)
+                        (progDesc "show current status"))
                  <> command "kill"          (info (pure Kill)
                         (progDesc "kill the current running lord session"))
                   )
@@ -69,6 +73,7 @@ main = do
                  DoubanTrending   -> doubanTrending
                  DoubanSearch key -> doubanSearch key
         JingFM (JingListen key) -> jingListen nodaemon key
+        Status -> lordStatus
         Kill -> killLord
 
 cmdOptions :: Parser Command
@@ -133,6 +138,9 @@ jingListen nodaemon k = do
 
 listen :: Radio a => Bool -> Radio.Param a -> IO ()
 listen nodaemon param= do
+    -- Make sure ~/.lord exists
+    getLordDir >>= createDirectoryIfMissing False
+
     pid <- getPid
     logger <- if nodaemon then mkLogger True stdout 
               else getLogFile >>= flip openFile AppendMode >>= mkLogger True
@@ -146,12 +154,11 @@ listen nodaemon param= do
 killLord :: IO ()
 killLord = withMPD clear >> getPid >>= kill
 
-getPid :: IO FilePath
-getPid = do
-    home <- getRadioDir
-    return $ home ++ "/lord.pid"
-
-getLogFile :: IO FilePath
-getLogFile = do
-    home <- getRadioDir
-    return $ home ++ "/lord.log"
+lordStatus :: IO ()
+lordStatus = do
+    st <- fmap stState <$> withMPD status
+    let state = case st of
+            Right s  -> show s
+            Left err -> error $ show err
+    song <- getStateFile >>= readFile 
+    putStrLn $ "[" ++ state ++ "] " ++ song
