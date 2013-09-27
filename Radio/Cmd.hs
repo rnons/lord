@@ -83,15 +83,15 @@ instance Radio.Radio Cmd where
 
     tagged _ = False
 
+-- Currently, no api is provided to retrieve genre list.
 genres :: IO [String]
-genres = do 
-    res <- simpleHttp "http://cmd.fm/get.php?genres=1"
-    return $ fromMaybe [] (decode res :: Maybe [String])
+genres = return 
+    ["80s","Abstract","Acid Jazz","Acoustic","Acoustic Rock","Alternative","Ambient","Avantgarde","Ballads","Blues","Blues Rock","Breakbeats","Chillout","Chiptunes","Choir","Classic Rock","Classical","Classical Guitar","Contemporary","Dance","Dancehall","Death Metal","Dirty South","Disco","Dream Pop","Drum & Bass","Dub","Dubstep","Easy Listening","Electro House","Electronic","Electronic Pop","Electronic Rock","Folk Rock","Funk","Glitch","Grime","Grindcore","Grunge","Hard Rock","Hardcore","Heavy Metal","Hip-Hop","House","Indie","Indie Pop","Industrial Metal","Instrumental","Instrumental Rock","J-Pop","Jazz","Jazz Funk","Jazz Fusion","K-Pop","Latin Jazz","Metalcore","Minimal","Modern Jazz","Moombahton","New Wave","Nu Jazz","Opera","Orchestral","Piano","Pop","Post Hardcore","Post Rock","Progressive House","Progressive Metal","Progressive Rock","Punk","R&B","Rap","Reggae","Reggaeton","Riddim","Rock","Rock 'n' Roll","Shoegaze","Singer / Songwriter","Smooth Jazz","Soul","Synth Pop","Tech House","Techno","Thrash Metal","Trance","Trap","Trip-hop","Turntablism","Underground"]
 
 pprGenres :: [String] -> IO ()
 pprGenres [] = return ()
 pprGenres gs = do
-    putStrLn $ foldr1 f (take 3 gs)
-    pprGenres $ drop 3 gs
+    putStrLn $ foldr1 f (take 4 gs)
+    pprGenres $ drop 4 gs
   where
-    f a b = a ++ (concat $ take (30 - length(a)) $ repeat " ") ++ b
+    f a b = a ++ (concat $ take (20 - length(a)) $ repeat " ") ++ b
