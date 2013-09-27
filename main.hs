@@ -4,8 +4,12 @@ import           Data.Char (isDigit)
 import           Data.Default (def)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Options.Applicative
+import           Options.Applicative.Types (ParserPrefs, ParserInfo)
 import           System.Directory (createDirectoryIfMissing)
-import           System.IO (openFile, IOMode(AppendMode), stdout, SeekMode(..))
+import           System.Environment (getArgs, getProgName)
+import           System.Exit (exitWith, exitSuccess, ExitCode(..))
+import           System.IO ( openFile, IOMode(AppendMode)
+                           , hPutStr, stdout, stderr, SeekMode(..) )
 import           System.Log.FastLogger (mkLogger, Logger)
 import           System.Posix.Daemon
 import           System.Posix.Files (stdFileMode)
@@ -62,8 +66,9 @@ optParser = Options
 
 main :: IO ()
 main = do
-    o <- execParser $ info (helper <*> optParser) 
+    o <- execParser' $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
+    print o
     let nodaemon = optDaemon o
     case optCommand o of
         CmdFM subCommand ->
@@ -79,6 +84,30 @@ main = do
         JingFM (JingListen key) -> jingListen nodaemon key
         Status -> lordStatus
         Kill -> killLord
+
+-- Taken from Options.Applicative.Extra
+execParser' :: ParserInfo a -> IO a
+execParser' = customExecParser' (prefs idm)
+
+-- Taken from Options.Applicative.Extra
+customExecParser' :: ParserPrefs -> ParserInfo a -> IO a
+customExecParser' pprefs pinfo = do
+    args <- getArgs
+    
+    -- My modification!
+    -- Run lord with no args is equivalent to run lord status.
+    when (null args) $ lordStatus >> exitSuccess
+  
+    case execParserPure pprefs pinfo args of
+        Right a -> return a
+        Left failure -> do
+            progn <- getProgName
+            let c = errExitCode failure
+            msg <- errMessage failure progn
+            case c of
+                ExitSuccess -> putStr msg
+                _           -> hPutStr stderr msg
+            exitWith c
 
 cmdOptions :: Parser Command
 cmdOptions = CmdFM <$> subparser
