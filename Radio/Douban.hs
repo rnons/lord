@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE TypeFamilies #-}
+-- | Module of http://douban.fm
 module Radio.Douban where
 
 import           Codec.Binary.UTF8.String (encodeString)

@@ -1,5 +1,7 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 -- | Module of http://cmd.fm
-
 module Radio.Cmd where
 
 import qualified Control.Exception as E

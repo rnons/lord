@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 -- | Module of http://jing.fm
 -- It's a bit tricky to play jing.fm
 -- Notice the `play` function of **instance Radio**
-
 module Radio.Jing where
 
 import           Codec.Binary.UTF8.String (encodeString)

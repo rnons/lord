@@ -1,5 +1,7 @@
--- | A generic interface to online radio services
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
+-- | A generic interface to online radio services
 module Radio
   ( SongMeta(..)
   , Radio(..)
