@@ -31,7 +31,7 @@ data Cmd = Cmd
     , tag_list      :: String
     , waveform_url  :: String
     , stream_url    :: String
-    , last_listened :: Int
+    --, last_listened :: Int
     , main_type     :: String
     --, created_at    :: String
     --, updated_at    :: String
