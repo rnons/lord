@@ -1,7 +1,13 @@
 name:                lord
-version:             2013.8.24
+version:             1.20130928
 synopsis:            Lord of radio daemon
-description:         A unified interface to online radio service provider, use mpd as backend.
+description:         
+    A unified interface to online radio service providers, use mpd as backend.
+    .
+    Supported radios:
+    <http://cmd.fm>
+    <http://douban.fm>
+    <http://jing.fm>
 homepage:            https://github.com/rnons/lord
 bug-reports:         https://github.com/rnons/lord/issues
 license:             PublicDomain

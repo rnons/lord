@@ -68,7 +68,6 @@ main :: IO ()
 main = do
     o <- execParser' $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
-    print o
     let nodaemon = optDaemon o
     case optCommand o of
         CmdFM subCommand ->
