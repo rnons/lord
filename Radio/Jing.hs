@@ -107,25 +107,27 @@ instance Radio.Radio Jing where
             res <- http req' manager
             liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
 
-    songUrl tok x = do
-        let url = "http://jing.fm/api/v1/media/song/surl"
-            type_ = if highquality tok then "NO" else "MM"
-            query = [ ("type", Just type_)
-                    , ("mid", Just $ mid x)
-                    ] :: Query
-            aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
-            rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
+    songUrl tok x = E.catch 
+        (do
+            let url = "http://jing.fm/api/v1/media/song/surl"
+                type_ = if highquality tok then "NO" else "MM"
+                query = [ ("type", Just type_)
+                        , ("mid", Just $ mid x)
+                        ] :: Query
+                aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
+                rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
 
-        initReq <- parseUrl url
-        let req = initReq { method = "POST"
-                          , requestHeaders = [aHdr, rHdr]
-                          , queryString = renderQuery False query
-                          }
-        (Object hm) <- withManager $ \manager -> do
-            res <- http req manager
-            responseBody res $$+- sinkParser json
-        let (String surl) = fromJust $ HM.lookup "result" hm
-        return $ T.unpack surl
+            initReq <- parseUrl url
+            let req = initReq { method = "POST"
+                              , requestHeaders = [aHdr, rHdr]
+                              , queryString = renderQuery False query
+                              }
+            (Object hm) <- withManager $ \manager -> do
+                res <- http req manager
+                responseBody res $$+- sinkParser json
+            let (String surl) = fromJust $ HM.lookup "result" hm
+            return $ T.unpack surl)
+        (\e -> print (e :: E.SomeException) >> songUrl tok x)
 
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
 
@@ -144,15 +146,15 @@ instance Radio.Radio Jing where
         manager <- newManager def
         threadId <- forkIO $ E.catch 
             (do
+                let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
+                getStateFile >>= flip writeFile song
+
                 runResourceT $ do 
                     res <- http req manager
                     responseBody res $$+- sinkFile (home ++ "/lord.m4a")
                 -- This will block until downloaded.
 
-                let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
                 writeLog logger song 
-                getStateFile >>= flip writeFile song
-
                 putMVar downloaded ())
             (\e -> do
                 print (e :: E.SomeException)
