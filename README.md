@@ -3,6 +3,7 @@
 Online radio service commander using [mpd] as backend. Supported radios:
 
 - [cmd.fm]
+- [radioreddit.com]
 - [douban.fm]  Only in China?
 - [jing.fm] Only in China?
 
@@ -22,6 +23,9 @@ lord douban hot
 lord douban trending
 
 lord jing listen <keywords> [--no-daemon]
+
+lord reddit listen [<genre>] [--no-daemon]
+lord reddit genres
 ```
 
 
@@ -33,13 +37,10 @@ You might be interested in
 - [Jinkell]: [jing.fm] client using [mplayer] as backend
 
 [cmd.fm]: http://cmd.fm
+[radioreddit.com]: http://radioreddit.com
 [douban.fm]: http://douban.fm
 [jing.fm]: http://jing.fm
-[last.fm]: http://last.fm
 [MPD]: http://musicpd.org/
-[MPD客户端]: http://mpd.wikia.com/wiki/Clients
-[ArchWiki: MPD]: https://wiki.archlinux.org/index.php/Mpd
-[faad2]: http://www.audiocoding.com/faad2.html
 [mpg123]: http://www.mpg123.de/
 [mplayer]: http://www.mplayerhq.hu/
 [HadouRex]: http://github.com/rnons/HadouRex

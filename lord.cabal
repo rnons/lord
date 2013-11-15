@@ -19,6 +19,7 @@ category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
 tested-with:         GHC == 7.6.3
+Extra-Source-Files:  CHANGELOG
 
 source-repository   head
   type:             git

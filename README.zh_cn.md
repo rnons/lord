@@ -1,6 +1,6 @@
 # lord
 
-将[cmd.fm]，[douban.fm]和[jing.fm] (甚至更多的网络电台) 整合到一个框架下。后端使用[MPD]播放。
+将[cmd.fm]，[radioreddit.com]，[douban.fm]和[jing.fm] (甚至更多的网络电台) 整合到一个框架下。后端使用[MPD]播放。
 
 MPD有两大优势：占用资源小；客户端丰富。[MPD客户端]有图形界面，也有命令行界面，还可以运行在Android和iOS上，从而用手机遥控douban.fm和jing.fm。MPD客户端可以方便的实现搜索歌词、搜索专辑信息、搜索歌手信息，还可以同步收听纪录到[last.fm]。
 
@@ -40,6 +40,9 @@ lord douban hot
 lord douban trending
 
 lord jing listen <keywords> [--no-daemon]
+
+lord reddit listen [<genre>] [--no-daemon]
+lord reddit genres
 ```
 
 lord的操作方式非常简单，稍微需要注意的是
@@ -81,6 +84,7 @@ Decoders plugins:
 - [jinkell]：后端使用[mplayer]的jing.fm客户端
 
 [cmd.fm]: http://cmd.fm
+[radioreddit.com]: http://radioreddit.com
 [douban.fm]: http://douban.fm
 [jing.fm]: http://jing.fm
 [last.fm]: http://last.fm
