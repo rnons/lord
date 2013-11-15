@@ -15,18 +15,14 @@ module Radio
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>))
 import           Control.Concurrent.MVar
-import           Control.Concurrent (forkIO)
 import           Control.Monad (when)
 import           Data.Aeson (FromJSON, Value)
 import qualified Data.ByteString.Char8 as C
-import           Data.Conduit (runResourceT, ($$+-))
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
-import           System.IO (writeFile)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Log.FastLogger
-import           System.Log.FastLogger.Date (ZonedDate)
 
 eof = unsafePerformIO newEmptyMVar
 
@@ -64,9 +60,9 @@ class FromJSON a => Radio a where
 
 mpdLoad :: Path -> IO ()
 mpdLoad path = do
-    s <- withMPD $ do
-            clear
-            add path
+    withMPD $ do
+        clear
+        add path
     withMPD $ MPD.play Nothing
     mpdPlay
 

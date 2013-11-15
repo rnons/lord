@@ -89,7 +89,8 @@ instance Radio.Radio Douban  where
         let songs = HM.lookup "song" hm
         case fromJSON $ fromMaybe Null songs of
              Success s -> s
-             Error err -> []
+             Error _   -> []
+    parsePlaylist _ = error "Unrecognized playlist format."
 
     getPlaylist (Cid cid) = do
         let query = [ ("type", Just "n")

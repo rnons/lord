@@ -4,9 +4,10 @@ import Test.Hspec
 import Test.HUnit
 
 import Radio
-import Radio.Cmd
+import qualified Radio.Cmd as Cmd
 import Radio.Jing
 import Radio.Douban
+import qualified Radio.Reddit as Reddit
 
 
 main :: IO ()
@@ -17,7 +18,7 @@ spec :: Spec
 spec = do
     describe "getPlaylist" $ do
         it "cmd: given genre" $ do
-            ss <- Radio.getPlaylist (Genre "Dream Pop")
+            ss <- Radio.getPlaylist (Cmd.Genre "Dream Pop")
             assert $ length ss > 0
 
         it "douban: given channel id" $ do
@@ -31,4 +32,8 @@ spec = do
         it "jing" $ do
             tok <- readToken "postrock"
             ss <- Radio.getPlaylist $ fromJust tok
+            assert $ length ss > 0
+
+        it "reddit: given genre" $ do
+            ss <- Radio.getPlaylist (Reddit.Genre "indie")
             assert $ length ss > 0

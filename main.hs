@@ -4,13 +4,13 @@ import           Data.Char (isDigit)
 import           Data.Default (def)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Options.Applicative
-import           Options.Applicative.Types (ParserPrefs, ParserInfo)
+import           Options.Applicative.Types (ParserPrefs)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
 import           System.IO ( openFile, IOMode(AppendMode)
                            , hPutStr, stdout, stderr, SeekMode(..) )
-import           System.Log.FastLogger (mkLogger, Logger)
+import           System.Log.FastLogger (mkLogger)
 import           System.Posix.Daemon
 import           System.Posix.Files (stdFileMode)
 import           System.Posix.IO ( fdWrite, createFile, setLock
@@ -212,7 +212,7 @@ killLord = withMPD clear >> getPidFile >>= kill
 lordStatus :: IO ()
 lordStatus = do
     running <- getPidFile >>= isRunning
-    status <- 
+    myStatus <- 
         if running then do
             st <- fmap stState <$> withMPD status
             let state = case st of
@@ -221,4 +221,4 @@ lordStatus = do
             song <- getStateFile >>= readFile 
             return $ "[" ++ state ++ "] " ++ song
         else return "Not running!"
-    putStrLn status
+    putStrLn myStatus

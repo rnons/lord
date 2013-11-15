@@ -1,10 +1,11 @@
 name:                lord
-version:             1.20130928
-synopsis:            Lord of radio daemon
+version:             1.20131115
+synopsis:            A command line interface to online radios.
 description:         
     A unified interface to online radio service providers, use mpd as backend.
     .
     Supported radios:
+    <http://radioreddit.com>
     <http://cmd.fm>
     <http://douban.fm>
     <http://jing.fm>
