@@ -18,9 +18,10 @@ import           System.Posix.IO ( fdWrite, createFile, setLock
 import           System.Posix.Process (getProcessID)
 
 import Radio
-import Radio.Cmd
+import qualified Radio.Cmd as Cmd
 import Radio.Douban
-import Radio.Jing
+import Radio.Jing 
+import qualified Radio.Reddit as Reddit
 
 data Options = Options
     { optCommand    :: Command
@@ -30,6 +31,7 @@ data Options = Options
 data Command = CmdFM CmdSubCommand
              | DoubanFM DoubanSubCommand
              | JingFM JingSubCommand
+             | RedditFM RedditSubCommand
              | Status
              | Kill
     deriving (Eq, Show)
@@ -47,6 +49,10 @@ data DoubanSubCommand = DoubanListen String
 data JingSubCommand = JingListen String
     deriving (Eq, Show)
 
+data RedditSubCommand = RedditListen String
+                      | RedditGenreList
+    deriving (Eq, Show)
+
 type Keywords = String
 
 optParser :: Parser Options
@@ -57,6 +63,8 @@ optParser = Options
                         (progDesc "douban.fm commander"))
                  <> command "jing"          (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
+                 <> command "reddit"        (info (helper <*> redditOptions)
+                        (progDesc "radioreddit.com commander"))
                  <> command "status"        (info (pure Status)
                         (progDesc "show current status"))
                  <> command "kill"          (info (pure Kill)
@@ -72,8 +80,8 @@ main = do
     case optCommand o of
         CmdFM subCommand ->
             case subCommand of
-                CmdListen genre   -> listen nodaemon (cmd genre)
-                CmdGenreList      -> cmdGenres
+                CmdListen genre   -> listen nodaemon (Cmd.Genre genre)
+                CmdGenreList      -> Cmd.genres >>= Cmd.pprGenres
         DoubanFM subCommand -> 
             case subCommand of
                  DoubanListen key -> listen nodaemon (douban key)
@@ -81,6 +89,10 @@ main = do
                  DoubanTrending   -> doubanTrending
                  DoubanSearch key -> doubanSearch key
         JingFM (JingListen key) -> jingListen nodaemon key
+        RedditFM subCommand ->
+            case subCommand of
+                RedditListen genre   -> listen nodaemon (Reddit.Genre genre)
+                RedditGenreList      -> Reddit.genres >>= Reddit.pprGenres
         Status -> lordStatus
         Kill -> killLord
 
@@ -137,8 +149,14 @@ jingOptions = JingFM <$> subparser
               (progDesc "Provide keywords to listen to jing.fm"))
     )
 
-cmdGenres :: IO ()
-cmdGenres = genres >>= pprGenres
+redditOptions :: Parser Command
+redditOptions = RedditFM <$> subparser
+    ( command "listen" 
+        (info (helper <*> (RedditListen <$> argument str (metavar "GENRE")))
+              (progDesc "Provide genre to listen to radioreddit.com"))
+    <> command "genres" 
+        (info (pure RedditGenreList) (progDesc "List available genres"))
+    )
 
 doubanHot :: IO ()
 doubanHot = hot >>= pprChannels
@@ -148,9 +166,6 @@ doubanTrending = trending >>= pprChannels
 
 doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
-
-cmd :: Keywords -> Radio.Param Cmd
-cmd = Genre
 
 douban :: Keywords -> Radio.Param Douban
 douban k
