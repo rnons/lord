@@ -61,8 +61,8 @@ instance FromJSON Douban where
 
 getPlaylist' :: Query -> IO [Douban]
 getPlaylist' query = do
-    let url = "http://douban.fm/j/mine/playlist"
-    initReq <- parseUrl url
+    let rurl = "http://douban.fm/j/mine/playlist"
+    initReq <- parseUrl rurl
     let req = initReq { method = "GET"
                       , queryString = renderQuery False query
                       }
@@ -71,10 +71,10 @@ getPlaylist' query = do
         liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
 
 musicianID :: String -> IO (Maybe String)
-musicianID name = do
-    let url = "http://music.douban.com/search/" ++ 
-              (C.unpack $ urlEncode True (C.pack $ encodeString name))
-    rsp <- simpleHttp url
+musicianID mname = do
+    let rurl = "http://music.douban.com/search/" ++ 
+              (C.unpack $ urlEncode True (C.pack $ encodeString mname))
+    rsp <- simpleHttp rurl
     let cursor = fromDocument $ parseLBS rsp
         href = cursor $// element "a" 
                       >=> attributeIs "class" "ll musician_title "
@@ -98,8 +98,8 @@ instance Radio.Radio Douban  where
                     , ("from", Just "lord")
                     ]
         getPlaylist' query
-    getPlaylist (Musician name) = do
-        mId <- musicianID name
+    getPlaylist (Musician mname) = do
+        mId <- musicianID mname
         let query = [ ("type", Just "n")
                     , ("channel", Just "0")
                     , ("context", Just $ C.pack ("channel:0|musician_id:" ++ fromJust mId))
@@ -113,7 +113,7 @@ instance Radio.Radio Douban  where
 
     -- Songs from douban.fm comes with no tags!
     tagged _ = False
-
+    
 data Channel = Channel 
     { intro :: String
     , name :: String
@@ -155,31 +155,31 @@ pprChannels chs =
 
 -- | Return a list of hot channels.
 hot :: IO [Channel]
-hot = search' url
+hot = search' rurl
   where
-    url = "http://douban.fm/j/explore/hot_channels"
+    rurl = "http://douban.fm/j/explore/hot_channels"
 
 
 -- | Return a list of up trending channels.
 trending :: IO [Channel]
-trending = search' url
+trending = search' rurl
   where
-    url = "http://douban.fm/j/explore/up_trending_channels"
+    rurl = "http://douban.fm/j/explore/up_trending_channels"
 
 
 -- | Return a list of channels matching provided keywords.
 search :: String -> IO [Channel]
 search [] = return []
-search key = search' url
+search key = search' rurl
   where 
-    url = "http://douban.fm/j/explore/search?query=" ++ 
+    rurl = "http://douban.fm/j/explore/search?query=" ++ 
           -- encodeString: encode chinese characters
           (C.unpack $ urlEncode True (C.pack $ encodeString key))
 
 
 search' :: String -> IO [Channel]
-search' url = do
-    req <- parseUrl url
+search' rurl = do
+    req <- parseUrl rurl
     (Object hm) <- withManager $ \manager -> do
         res <- http req manager
         responseBody res $$+- sinkParser json

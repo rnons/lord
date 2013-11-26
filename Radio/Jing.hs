@@ -9,8 +9,6 @@ module Radio.Jing where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
-import           Control.Concurrent (forkIO, threadDelay)
-import           Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad (liftM, mzero)
 import           Data.Aeson
@@ -22,22 +20,16 @@ import qualified Data.Text as T
 import           Data.Yaml
 import           Data.CaseInsensitive (mk)
 import           Data.Conduit (runResourceT, ($$+-))
-import           Data.Conduit.Binary (sinkFile)
 import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
-import           Network.MPD hiding (play, Value, Query)
-import qualified Network.MPD as MPD
 import           System.IO
-import           System.IO.Unsafe (unsafePerformIO)
 import           System.Directory (doesFileExist)
 
-import Radio
+import qualified Radio
 
 type Param a = Radio.Param Jing
-
-downloaded = unsafePerformIO newEmptyMVar
 
 data Jing = Jing 
     { abid :: Int       -- album id
@@ -127,77 +119,14 @@ instance Radio.Radio Jing where
                 responseBody res $$+- sinkParser json
             let (String surl) = fromJust $ HM.lookup "result" hm
             return $ T.unpack surl)
-        (\e -> print (e :: E.SomeException) >> songUrl tok x)
+        (\e -> print (e :: E.SomeException) >> Radio.songUrl tok x)
 
     songMeta x = Radio.SongMeta (atn x) (an x) (n x)
 
     -- Songs from jing.fm comes with tags!
     tagged _ = True
-
-    -- The media file jing.fm provides is of m4a type.
-    -- MPD is unable to stream m4a file, as a result, lord streams it to 
-    -- ~/.lord/lord.m4a
-    play logger reqData [] = Radio.getPlaylist reqData >>= Radio.play logger reqData
-    play logger reqData (x:xs) = do
-        surl <- Radio.songUrl reqData x
-        print surl
-        req <- parseUrl surl
-        home <- Radio.getLordDir
-        manager <- newManager def
-        threadId <- forkIO $ E.catch 
-            (do
-                let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
-                getStateFile >>= flip writeFile song
-
-                runResourceT $ do 
-                    res <- http req manager
-                    responseBody res $$+- sinkFile (home ++ "/lord.m4a")
-                -- This will block until downloaded.
-
-                writeLog logger song 
-                putMVar downloaded ())
-            (\e -> do
-                print (e :: E.SomeException)
-                Radio.writeLog logger $ show e
-                Radio.play logger reqData xs
-                )
-        --mtid <- newMVar threadId
-        threadDelay 3000000
-        mpdLoad
-        Radio.play logger reqData xs
-
-mpdLoad :: IO ()
-mpdLoad = do
-    --m4a <- (++ "/lord.m4a") <$> Radio.getLordDir
-    let m4a = "lord/lord.m4a"
-    s <- withMPD $ do
-            clear
-            update [Path "lord"]
-            add m4a
-    case s of
-        Right _ -> do
-            withMPD $ MPD.play Nothing
-            mpdPlay
-        _                  -> mpdLoad
-
-mpdPlay :: IO ()
-mpdPlay = do
-    withMPD $ idle [PlayerS]   
-    -- This will block until paused/finished.
-
-    st <- withMPD status
-    let st' = fmap stState st
-    print st'
-    bd <- isEmptyMVar downloaded
-    if st' == Right Stopped 
-        then if bd 
-                then do                                     -- Slow Network
-                    withMPD $ MPD.play Nothing
-                    mpdPlay
-                else do
-                    withMPD clear
-                    takeMVar downloaded                     -- Finished
-        else mpdPlay                                        -- Pause
+    
+    playable _ = False
 
 instance FromJSON (Radio.Param Jing)
 instance ToJSON (Radio.Param Jing)
