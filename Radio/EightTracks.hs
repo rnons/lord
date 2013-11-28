@@ -9,7 +9,7 @@ module Radio.EightTracks where
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
 import qualified Control.Exception as E
-import           Control.Monad (liftM, mzero)
+import           Control.Monad (forM_, liftM, mzero)
 import           Data.Aeson
 import           Data.Aeson.Types (defaultOptions, Options(..))
 import           Data.ByteString (ByteString)
@@ -24,10 +24,12 @@ import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
+import           System.Console.ANSI
 import           System.IO
 import           System.Directory (doesFileExist)
 
 import qualified Radio
+import qualified Radio.EightTracks.Explore as Exp
 
 
 apiKey :: String
@@ -113,3 +115,36 @@ newSession mId = do
     return $ Token (play_token ses) mId
   where
     rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey 
+
+search :: String -> IO [Exp.Mix]
+search [] = return []
+search key = search' rurl
+  where 
+    rurl = "http://8tracks.com/mix_sets/keyword:" ++ key ++ ".json?include=mixes"
+
+search' :: String -> IO [Exp.Mix]
+search' rurl = do
+    initReq <- parseUrl rurl
+    let aHdr = (mk "X-Api-Version", "3") :: Header
+        rHdr = (mk "X-Api-Key", C.pack apiKey) :: Header
+    let req = initReq { requestHeaders = [aHdr, rHdr] }
+    val <- withManager $ \manager -> do
+        res <- http req manager
+        responseBody res $$+- sinkParser json
+
+    case fromJSON val of
+        Success v -> return $ Exp.mixes $ Exp.mix_set v
+        Error err -> putStrLn err >> return []
+
+pprMixes :: [Exp.Mix] -> IO ()
+pprMixes mixes =
+    forM_ mixes (\m -> do
+        setSGR [SetConsoleIntensity BoldIntensity]
+        putStr $ "* " ++ Exp.name m 
+        setSGR [SetColor Foreground Vivid Green]
+        putStrLn $ " id=" ++ show (Exp.id m)
+        setSGR [Reset]
+        putStrLn $ "    Description: " ++ Exp.description m
+        putStrLn $ "    Tags: " ++ Exp.tag_list_cache m
+        putStrLn ""
+        )
