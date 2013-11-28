@@ -181,7 +181,9 @@ jingListen nodaemon k = do
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
             listen nodaemon tok'
-        _         -> login k >>= listen nodaemon
+        _         -> do 
+            param <- login k :: IO (Radio.Param Jing)
+            listen nodaemon param
 
 listen :: Radio a => Bool -> Radio.Param a -> IO ()
 listen nodaemon param = do

@@ -24,10 +24,9 @@ import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
-import           System.IO
 import           System.Directory (doesFileExist)
 
-import qualified Radio
+import Radio
 
 type Param a = Radio.Param Jing
 
@@ -131,71 +130,42 @@ instance Radio.Radio Jing where
 instance FromJSON (Radio.Param Jing)
 instance ToJSON (Radio.Param Jing)
 
-login :: String -> IO (Radio.Param Jing)
-login keywords = do
-    hSetBuffering stdout NoBuffering
-    hSetEcho stdin True 
-    putStrLn "Please Log in"
-    putStr "Email: "
-    email <- getLine
-    putStr "Password: "
-    hSetEcho stdin False 
-    pwd <- getLine
-    hSetEcho stdin True 
-    putStrLn ""
-    mtoken <- createSession keywords email pwd
-    case mtoken of
-         Just tok -> do
-             saveToken tok
-             return tok
-         Nothing  -> do
-             putStrLn "ERROR: Invalid email or password!"
-             login keywords
+instance NeedLogin Jing where
+    createSession keywords email pwd = do
+        let url = "http://jing.fm/api/v1/sessions/create"
+            query = [ ("email", C.pack email) , ("pwd", C.pack pwd) ]
+        req <- parseUrl url
+        let req' = urlEncodedBody query req
+        res <- withManager $ \manager -> http req' manager
+        let hmap = HM.fromList $ responseHeaders res
+            atoken = HM.lookup "Jing-A-Token-Header" hmap
+            rtoken = HM.lookup "Jing-R-Token-Header" hmap
+            parseToken :: Value -> Maybe (Radio.Param Jing)
+            parseToken (Object hm) = do
+                let user = HM.lookup "result" hm >>= 
+                           \(Object hm') -> HM.lookup "usr" hm'
+                case fromJSON $ fromMaybe Null user of
+                    Success u -> Token <$> atoken
+                                       <*> rtoken
+                                       <*> (Just $ userid u)
+                                       <*> (Just $ usernick u)
+                                       <*> Just keywords
+                                       <*> Just True
+                    Error err -> error $ "Retrieve token failed: " ++ show err
+            parseToken _ = error "Unrecognized token format."
+        liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
 
-createSession :: String -> String -> String -> IO (Maybe (Radio.Param Jing))
-createSession keywords email pwd = do
-    let url = "http://jing.fm/api/v1/sessions/create"
-        query = [ ("email", C.pack email) , ("pwd", C.pack pwd) ]
-    req <- parseUrl url
-    let req' = urlEncodedBody query req
-    res <- withManager $ \manager -> http req' manager
-    let hmap = HM.fromList $ responseHeaders res
-        atoken = HM.lookup "Jing-A-Token-Header" hmap
-        rtoken = HM.lookup "Jing-R-Token-Header" hmap
-        parseToken :: Value -> Maybe (Radio.Param Jing)
-        parseToken (Object hm) = do
-            let user = HM.lookup "result" hm >>= 
-                       \(Object hm') -> HM.lookup "usr" hm'
-            case fromJSON $ fromMaybe Null user of
-                Success u -> Token <$> atoken
-                                   <*> rtoken
-                                   <*> (Just $ userid u)
-                                   <*> (Just $ usernick u)
-                                   <*> Just keywords
-                                   <*> Just True
-                Error err -> error $ "Retrieve token failed: " ++ show err
-        parseToken _ = error "Unrecognized token format."
-    liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
-
-saveToken :: Radio.Param Jing -> IO ()
-saveToken tok = do
-    home <- Radio.getLordDir
-    let yml = home ++ "/lord.yml"
-    encodeFile yml tok
-    putStrLn "Your token has been saved to ~/lord.yml"
-
-readToken :: String -> IO (Maybe (Radio.Param Jing))
-readToken keywords = do
-    home <- Radio.getLordDir
-    let yml = home ++ "/lord.yml"
-    exist <- doesFileExist yml
-    if exist
-       then do
-            conf <- decodeFile yml
-            case conf of
-                Nothing -> error $ "Invalid YAML file: " ++ show conf
-                Just c -> 
-                    case fromJSON c of
-                        Success tok -> return $ Just $ tok { cmbt = keywords }
-                        Error err -> error $ "Parse token failed: " ++ show err
-       else return Nothing
+    readToken keywords = do
+        home <- Radio.getLordDir
+        let yml = home ++ "/lord.yml"
+        exist <- doesFileExist yml
+        if exist
+           then do
+                conf <- decodeFile yml
+                case conf of
+                    Nothing -> error $ "Invalid YAML file: " ++ show conf
+                    Just c -> 
+                        case fromJSON c of
+                            Success tok -> return $ Just $ tok { cmbt = keywords }
+                            Error err -> error $ "Parse token failed: " ++ show err
+           else return Nothing

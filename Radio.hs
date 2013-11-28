@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -5,6 +6,7 @@
 module Radio
   ( SongMeta(..)
   , Radio(..)
+  , NeedLogin(..)
   , getLordDir
   , getPidFile
   , getLogFile
@@ -18,14 +20,16 @@ import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad (liftM, when, void)
-import           Data.Aeson (FromJSON, Value)
+import           Data.Aeson (fromJSON, FromJSON, Result(..), Value)
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
+import           Data.Yaml
 import           Network.HTTP.Conduit hiding (path)
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
-import           System.Directory (getHomeDirectory)
+import           System.Directory (doesFileExist, getHomeDirectory)
+import           System.IO
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Log.FastLogger
 
@@ -166,6 +170,38 @@ class FromJSON a => Radio a where
                             takeMVar eof                     -- Finished
                 else mpdPlay                                 -- Pause
 
+class (Radio a, ToJSON (Param a)) => NeedLogin a where
+    login :: String -> IO (Param a)
+    login keywords = do
+        hSetBuffering stdout NoBuffering
+        hSetEcho stdin True 
+        putStrLn "Please Log in"
+        putStr "Email: "
+        email <- getLine
+        putStr "Password: "
+        hSetEcho stdin False 
+        pwd <- getLine
+        hSetEcho stdin True 
+        putStrLn ""
+        mtoken <- createSession keywords email pwd
+        case mtoken of
+             Just tok -> do
+                 saveToken tok
+                 return tok
+             Nothing  -> do
+                 putStrLn "ERROR: Invalid email or password!"
+                 login keywords
+
+    createSession :: String -> String -> String -> IO (Maybe (Param a))
+
+    saveToken :: Param a -> IO ()
+    saveToken tok = do
+        home <- getLordDir
+        let yml = home ++ "/lord.yml"
+        encodeFile yml tok
+        putStrLn "Your token has been saved to ~/lord.yml"
+
+    readToken :: String -> IO (Maybe (Param a))
 
 getLordDir :: IO FilePath
 getLordDir = (++ "/.lord") <$> getHomeDirectory
