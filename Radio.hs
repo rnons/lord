@@ -17,12 +17,12 @@ import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import qualified Control.Exception as E
-import           Control.Monad (when)
+import           Control.Monad (liftM, when)
 import           Data.Aeson (FromJSON, Value)
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
-import           Network.HTTP.Conduit
+import           Network.HTTP.Conduit hiding (path)
 import           Network.MPD hiding (play, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (getHomeDirectory)
@@ -60,27 +60,6 @@ class FromJSON a => Radio a where
     play logger reqData [] = getPlaylist reqData >>= play logger reqData
     play logger reqData (x:xs)
       | playable x = do
-        let 
-            mpdLoad :: Path -> IO ()
-            mpdLoad path = do
-                withMPD $ do
-                    clear
-                    add path
-                withMPD $ MPD.play Nothing
-                mpdPlay
-
-            mpdPlay :: IO ()
-            mpdPlay = do
-                withMPD $ idle [PlayerS]   
-                -- This will block until paused/finished.
-
-                st <- withMPD status
-                let st' = fmap stState st
-                print st'
-                if st' == Right Stopped 
-                    then putMVar eof ()
-                    else mpdPlay
-
         surl <- songUrl reqData x
         print surl
         when (surl /= "") $ do
@@ -91,46 +70,12 @@ class FromJSON a => Radio a where
             takeMVar eof                     -- Finished
         play logger reqData xs
       | otherwise = do
-        let 
-            mpdLoad :: IO ()
-            mpdLoad = do
-                --m4a <- (++ "/lord.m4a") <$> getLordDir
-                let m4a = "lord/lord.m4a"
-                s <- withMPD $ do
-                        clear
-                        update [Path "lord"]
-                        add m4a
-                case s of
-                    Right _ -> do
-                        withMPD $ MPD.play Nothing
-                        mpdPlay
-                    _                  -> mpdLoad
-
-            mpdPlay :: IO ()
-            mpdPlay = do
-                withMPD $ idle [PlayerS]   
-                -- This will block until paused/finished.
-
-                st <- withMPD status
-                let st' = fmap stState st
-                print st'
-                bd <- isEmptyMVar eof
-                if st' == Right Stopped 
-                    then if bd 
-                            then do                                     -- Slow Network
-                                withMPD $ MPD.play Nothing
-                                mpdPlay
-                            else do
-                                withMPD clear
-                                takeMVar eof                     -- Finished
-                    else mpdPlay                                        -- Pause
-
         surl <- songUrl reqData x
         print surl
         req <- parseUrl surl
         home <- getLordDir
         manager <- newManager def
-        threadId <- forkIO $ E.catch 
+        forkIO $ E.catch 
             (do
                 let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
                 getStateFile >>= flip writeFile song
@@ -147,10 +92,60 @@ class FromJSON a => Radio a where
                 writeLog logger $ show e
                 play logger reqData xs
                 )
-        --mtid <- newMVar threadId
         threadDelay 3000000
-        mpdLoad
+        mpdLoad m4a
         play logger reqData xs
+      where
+        m4a = "lord/lord.m4a"
+
+        mpdLoad :: Path -> IO ()
+        mpdLoad path
+          | playable x = do
+            withMPD $ do
+                clear
+                add path
+            withMPD $ MPD.play Nothing
+            mpdPlay
+          | otherwise = do
+            s <- withMPD $ do
+                    clear
+                    update [Path "lord"]
+                    add path
+            case s of
+                Right _ -> do
+                    withMPD $ MPD.play Nothing
+                    mpdPlay
+                _                  -> mpdLoad path
+
+        mpdState :: IO (MPD.Response State)
+        mpdState = do
+            withMPD $ idle [PlayerS]   
+            -- This will block until paused/finished.
+
+            st <- liftM stState <$> withMPD status
+            print st
+            return st
+
+        mpdPlay :: IO ()
+        mpdPlay
+          | playable x = do
+            st <- mpdState
+            if st == Right Stopped 
+                then putMVar eof ()
+                else mpdPlay
+          | otherwise = do
+            st <- mpdState
+            bd <- isEmptyMVar eof
+            if st == Right Stopped 
+                then if bd 
+                        then do                              -- Slow Network
+                            withMPD $ MPD.play Nothing
+                            mpdPlay
+                        else do
+                            withMPD clear
+                            takeMVar eof                     -- Finished
+                else mpdPlay                                 -- Pause
+
 
 getLordDir :: IO FilePath
 getLordDir = (++ "/.lord") <$> getHomeDirectory
