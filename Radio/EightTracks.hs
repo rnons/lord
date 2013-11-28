@@ -24,6 +24,7 @@ import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
+import           Prelude hiding (id)
 import           System.Console.ANSI
 import           System.IO
 import           System.Directory (doesFileExist)
@@ -34,6 +35,10 @@ import qualified Radio.EightTracks.Explore as Exp
 
 apiKey :: String
 apiKey = "1de30eb2b8fe85b1740cfbee3fdbb928e2c7249b"
+
+aHdr, rHdr :: Header
+aHdr = (mk "X-Api-Version", "3")
+rHdr = (mk "X-Api-Key", C.pack apiKey)
 
 type Param a = Radio.Param EightTracks
 
@@ -46,7 +51,8 @@ data PlaySession = PlaySession
     } deriving (Show, Generic)
 
 data EightTracks = EightTracks 
-    { track_file_stream_url :: String
+    { id                    :: Int
+    , track_file_stream_url :: String
     , name                  :: String
     , performer             :: String
     , release_name          :: String
@@ -87,8 +93,6 @@ instance Radio.Radio EightTracks where
     getPlaylist tok = do
         let rurl = "http://8tracks.com/sets/" ++ playToken tok  ++ "/next.json"
             query = [ ("mix_id", C.pack $ show $ mixId tok) ]
-            aHdr = (mk "X-Api-Version", "3") :: Header
-            rHdr = (mk "X-Api-Key", C.pack apiKey) :: Header
 
         initReq <- parseUrl rurl
         let req = initReq { requestHeaders = [aHdr, rHdr] 
@@ -104,6 +108,20 @@ instance Radio.Radio EightTracks where
     tagged _ = False
     
     playable _ = False
+
+    reportRequired _ = True
+
+    -- At 30 seconds, report song played
+    report tok x = do
+        initReq <- parseUrl rurl
+        let req = initReq { requestHeaders = [aHdr, rHdr] 
+                          , queryString = renderSimpleQuery False query }
+        res <- withManager $ \manager -> httpLbs req manager
+        print $ responseBody res
+      where
+        rurl = "http://8tracks.com/sets/" ++ playToken tok ++ "/report.json"
+        query = [ ("track_id", C.pack $ show $ id x)
+                , ("mix_id", C.pack $ show $ mixId tok) ]
 
 instance FromJSON (Radio.Param EightTracks)
 instance ToJSON (Radio.Param EightTracks)
@@ -125,8 +143,6 @@ search key = search' rurl
 search' :: String -> IO [Exp.Mix]
 search' rurl = do
     initReq <- parseUrl rurl
-    let aHdr = (mk "X-Api-Version", "3") :: Header
-        rHdr = (mk "X-Api-Key", C.pack apiKey) :: Header
     let req = initReq { requestHeaders = [aHdr, rHdr] }
     val <- withManager $ \manager -> do
         res <- http req manager

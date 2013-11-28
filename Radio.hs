@@ -17,7 +17,7 @@ import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import qualified Control.Exception as E
-import           Control.Monad (liftM, when)
+import           Control.Monad (liftM, when, void)
 import           Data.Aeson (FromJSON, Value)
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
@@ -56,6 +56,22 @@ class FromJSON a => Radio a where
     playable :: a -> Bool
     playable _ = True
 
+    reportRequired :: a -> Bool
+    reportRequired _ = False
+
+    report :: Param a -> a -> IO ()
+    report _ _ = return ()
+
+    reportLoop :: Param a -> a -> IO ()
+    reportLoop param x = do
+        time <- liftM stTime <$> withMPD status
+        case time of
+            Right (elapsed, _) ->
+                if elapsed < 30 
+                    then threadDelay (5*10^6) >> reportLoop param x
+                    else report param x
+            Left err -> print err
+
     play :: Logger -> Param a -> [a] -> IO ()
     play logger reqData [] = getPlaylist reqData >>= play logger reqData
     play logger reqData (x:xs)
@@ -66,6 +82,8 @@ class FromJSON a => Radio a where
             let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
             writeLog logger song 
             getStateFile >>= flip writeFile song
+            -- Report song played if needed
+            when (reportRequired x) $ void (forkIO $ reportLoop reqData x)
             mpdLoad $ Path $ C.pack surl
             takeMVar eof                     -- Finished
         play logger reqData xs
@@ -78,21 +96,23 @@ class FromJSON a => Radio a where
         forkIO $ E.catch 
             (do
                 let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
+                writeLog logger song 
                 getStateFile >>= flip writeFile song
+                -- Report song played if needed
+                when (reportRequired x) $ void (forkIO $ reportLoop reqData x)
 
                 runResourceT $ do 
                     res <- http req manager
                     responseBody res $$+- sinkFile (home ++ "/lord.m4a")
                 -- This will block until eof.
 
-                writeLog logger song 
                 putMVar eof ())
             (\e -> do
                 print (e :: E.SomeException)
                 writeLog logger $ show e
                 play logger reqData xs
                 )
-        threadDelay 3000000
+        threadDelay (3*10^6)
         mpdLoad m4a
         play logger reqData xs
       where
