@@ -155,6 +155,10 @@ instance NeedLogin Jing where
             parseToken _ = error "Unrecognized token format."
         liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
 
+    data Config Jing = Config { jing :: Radio.Param Jing } deriving Generic
+
+    mkConfig tok = Config tok
+
     readToken keywords = do
         home <- Radio.getLordDir
         let yml = home ++ "/lord.yml"
@@ -166,6 +170,9 @@ instance NeedLogin Jing where
                     Nothing -> error $ "Invalid YAML file: " ++ show conf
                     Just c -> 
                         case fromJSON c of
-                            Success tok -> return $ Just $ tok { cmbt = keywords }
+                            Success tok -> return $ Just $ (jing tok) { cmbt = keywords }
                             Error err -> error $ "Parse token failed: " ++ show err
            else return Nothing
+
+instance FromJSON (Radio.Config Jing)
+instance ToJSON (Radio.Config Jing)

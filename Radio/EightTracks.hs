@@ -29,16 +29,17 @@ import           System.Console.ANSI
 import           System.IO
 import           System.Directory (doesFileExist)
 
-import qualified Radio
+import Radio
 import qualified Radio.EightTracks.Explore as Exp
+import qualified Radio.EightTracks.User as U
 
 
 apiKey :: String
 apiKey = "1de30eb2b8fe85b1740cfbee3fdbb928e2c7249b"
 
-aHdr, rHdr :: Header
-aHdr = (mk "X-Api-Version", "3")
-rHdr = (mk "X-Api-Key", C.pack apiKey)
+verHdr, keyHdr :: Header
+verHdr = (mk "X-Api-Version", "3")
+keyHdr = (mk "X-Api-Key", C.pack apiKey)
 
 type Param a = Radio.Param EightTracks
 
@@ -81,11 +82,12 @@ instance FromJSON MixResponse where
 
 instance Radio.Radio EightTracks where
     data Param EightTracks = Token
-        { playToken     :: String
+        { userToken     :: String
+        , playToken     :: String
         , mixId         :: Int
         } deriving (Show, Generic)
 
-    parsePlaylist val = do
+    parsePlaylist val =
         case fromJSON val of
             Success s -> [track $ mix_set s]
             Error err -> error $ "Parse playlist failed: " ++ show err
@@ -95,7 +97,7 @@ instance Radio.Radio EightTracks where
             query = [ ("mix_id", C.pack $ show $ mixId tok) ]
 
         initReq <- parseUrl rurl
-        let req = initReq { requestHeaders = [aHdr, rHdr] 
+        let req = initReq { requestHeaders = [verHdr, keyHdr] 
                           , queryString = renderSimpleQuery False query }
         withManager $ \manager -> do
             res <- http req manager
@@ -114,7 +116,8 @@ instance Radio.Radio EightTracks where
     -- At 30 seconds, report song played
     report tok x = do
         initReq <- parseUrl rurl
-        let req = initReq { requestHeaders = [aHdr, rHdr] 
+        let usrHdr = (mk "X-User-Token", C.pack $ userToken tok)
+            req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr] 
                           , queryString = renderSimpleQuery False query }
         res <- withManager $ \manager -> httpLbs req manager
         print $ responseBody res
@@ -126,11 +129,50 @@ instance Radio.Radio EightTracks where
 instance FromJSON (Radio.Param EightTracks)
 instance ToJSON (Radio.Param EightTracks)
 
-newSession :: Int -> IO (Radio.Param EightTracks)
-newSession mId = do
+instance NeedLogin EightTracks where
+    createSession strMixId email pwd = do
+        initReq <- parseUrl rurl
+        let req = initReq { method = "POST"
+                          , queryString = renderSimpleQuery False query
+                          , requestHeaders = [verHdr] }
+        res <- withManager $ \manager -> httpLbs req manager
+        case eitherDecode $ responseBody res of
+            Right r  -> do
+                pTok <- newPlayToken
+                return $ Just $ Token (U.user_token $ U.user r) pTok mId
+            Left err -> print err >> return Nothing
+      where
+        rurl = "http://8tracks.com/sessions.json"
+        query = [ ("login", C.pack email), ("password", C.pack pwd) ]
+        mId = read strMixId :: Int
+
+    data Config EightTracks = Config { eight :: Radio.Param EightTracks } deriving Generic
+
+    mkConfig tok = Config tok
+
+    readToken mid = do
+        home <- Radio.getLordDir
+        let yml = home ++ "/lord.yml"
+        exist <- doesFileExist yml
+        if exist
+           then do
+                conf <- decodeFile yml
+                case conf of
+                    Nothing -> error $ "Invalid YAML file: " ++ show conf
+                    Just c -> 
+                        case fromJSON c of
+                            Success tok -> return $ Just $ (eight tok) { mixId = read mid }
+                            Error err -> error $ "Parse token failed: " ++ show err
+           else return Nothing
+
+instance FromJSON (Radio.Config EightTracks)
+instance ToJSON (Radio.Config EightTracks)
+
+newPlayToken :: IO String
+newPlayToken = do
     res <- simpleHttp rurl
-    let ses = fromJust $ (decode res :: Maybe PlaySession)
-    return $ Token (play_token ses) mId
+    let ses = fromJust (decode res :: Maybe PlaySession)
+    return $ play_token ses
   where
     rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey 
 
@@ -143,7 +185,7 @@ search key = search' rurl
 search' :: String -> IO [Exp.Mix]
 search' rurl = do
     initReq <- parseUrl rurl
-    let req = initReq { requestHeaders = [aHdr, rHdr] }
+    let req = initReq { requestHeaders = [verHdr, keyHdr] }
     val <- withManager $ \manager -> do
         res <- http req manager
         responseBody res $$+- sinkParser json

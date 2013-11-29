@@ -21,6 +21,7 @@ import           Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad (liftM, when, void)
 import           Data.Aeson (fromJSON, FromJSON, Result(..), Value)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
@@ -170,7 +171,7 @@ class FromJSON a => Radio a where
                             takeMVar eof                     -- Finished
                 else mpdPlay                                 -- Pause
 
-class (Radio a, ToJSON (Param a)) => NeedLogin a where
+class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
     login :: String -> IO (Param a)
     login keywords = do
         hSetBuffering stdout NoBuffering
@@ -194,12 +195,21 @@ class (Radio a, ToJSON (Param a)) => NeedLogin a where
 
     createSession :: String -> String -> String -> IO (Maybe (Param a))
 
+    data Config a :: *
+
+    mkConfig :: Param a -> Config a
+
     saveToken :: Param a -> IO ()
     saveToken tok = do
         home <- getLordDir
         let yml = home ++ "/lord.yml"
-        encodeFile yml tok
-        putStrLn "Your token has been saved to ~/lord.yml"
+        exist <- doesFileExist yml
+        bs <- if exist
+            then B.readFile yml
+            else return ""
+        let config = mkConfig tok
+        B.writeFile yml $ B.append bs (encode config)
+        putStrLn $ "Your token has been saved to " ++ yml
 
     readToken :: String -> IO (Maybe (Param a))
 
