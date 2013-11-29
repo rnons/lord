@@ -20,6 +20,7 @@ import           System.Posix.Process (getProcessID)
 import Radio
 import qualified Radio.Cmd as Cmd
 import Radio.Douban
+import qualified Radio.EightTracks as ET
 import Radio.Jing 
 import qualified Radio.Reddit as Reddit
 
@@ -30,6 +31,7 @@ data Options = Options
 
 data Command = CmdFM CmdSubCommand
              | DoubanFM DoubanSubCommand
+             | EightTracks ETSubCommand
              | JingFM JingSubCommand
              | RedditFM RedditSubCommand
              | Status
@@ -44,6 +46,10 @@ data DoubanSubCommand = DoubanListen String
                       | DoubanHot
                       | DoubanTrending
                       | DoubanSearch String
+    deriving (Eq, Show)
+
+data ETSubCommand = ETListen String
+                  | ETSearch String
     deriving (Eq, Show)
 
 data JingSubCommand = JingListen String
@@ -61,6 +67,8 @@ optParser = Options
                         (progDesc "cmd.fm commander"))
                  <> command "douban"        (info (helper <*> doubanOptions)
                         (progDesc "douban.fm commander"))
+                 <> command "8tracks"       (info (helper <*> etOptions)
+                        (progDesc "8tracks.com commander"))
                  <> command "jing"          (info (helper <*> jingOptions)
                         (progDesc "jing.fm commander"))
                  <> command "reddit"        (info (helper <*> redditOptions)
@@ -88,6 +96,10 @@ main = do
                  DoubanHot        -> doubanHot
                  DoubanTrending   -> doubanTrending
                  DoubanSearch key -> doubanSearch key
+        EightTracks subCommand ->
+            case subCommand of
+                ETListen mId -> etListen nodaemon mId
+                ETSearch key -> etSearch key
         JingFM (JingListen key) -> jingListen nodaemon key
         RedditFM subCommand ->
             case subCommand of
@@ -142,6 +154,16 @@ doubanOptions = DoubanFM <$> subparser
         (info (pure DoubanTrending) (progDesc "trending up channels"))
     )
 
+etOptions :: Parser Command
+etOptions = EightTracks <$> subparser
+    ( command "listen"
+        (info (helper <*> (ETListen <$> argument str (metavar "mix id")))
+              (progDesc "Provide mix id to listen to 8tracks.com"))
+    <> command "search"
+        (info (helper <*> (ETSearch <$> argument str (metavar "KEYWORDS")))
+              (progDesc "search mixes"))
+    )
+
 jingOptions :: Parser Command
 jingOptions = JingFM <$> subparser 
     ( command "listen" 
@@ -173,6 +195,20 @@ douban k
     | otherwise = Musician k
   where
     isChId = and . fmap isDigit
+
+etListen :: Bool -> Keywords -> IO ()
+etListen nodaemon k = do
+    tok <- readToken k
+    case tok of
+        Just tok' -> do
+            putStrLn $ "Welcome back, " ++ ET.userName tok'
+            listen nodaemon tok'
+        _         -> do 
+            param <- login k :: IO (Radio.Param ET.EightTracks)
+            listen nodaemon param
+
+etSearch :: String -> IO ()
+etSearch key = ET.search key >>= ET.pprMixes
 
 jingListen :: Bool -> Keywords -> IO ()
 jingListen nodaemon k = do

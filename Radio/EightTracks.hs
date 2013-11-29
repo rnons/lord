@@ -6,17 +6,11 @@
 -- | Module of http://8tracks.com
 module Radio.EightTracks where
 
-import           Codec.Binary.UTF8.String (encodeString)
-import           Control.Applicative ((<$>), (<*>))
-import qualified Control.Exception as E
-import           Control.Monad (forM_, liftM, mzero)
+import           Control.Monad (forM_, liftM)
 import           Data.Aeson
 import           Data.Aeson.Types (defaultOptions, Options(..))
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
-import qualified Data.HashMap.Strict as HM
-import           Data.Maybe (fromJust, fromMaybe)
-import qualified Data.Text as T
+import           Data.Maybe (fromJust)
 import           Data.Yaml hiding (decode)
 import           Data.CaseInsensitive (mk)
 import           Data.Conduit (($$+-))
@@ -26,7 +20,6 @@ import           Network.HTTP.Types
 import           Network.HTTP.Conduit
 import           Prelude hiding (id)
 import           System.Console.ANSI
-import           System.IO
 import           System.Directory (doesFileExist)
 
 import Radio
@@ -83,7 +76,8 @@ instance FromJSON MixResponse where
 instance Radio.Radio EightTracks where
     data Param EightTracks = Token
         { userToken     :: String
-        , playToken     :: String
+        , userName      :: String
+        , playToken     :: Int
         , mixId         :: Int
         } deriving (Show, Generic)
 
@@ -93,7 +87,7 @@ instance Radio.Radio EightTracks where
             Error err -> error $ "Parse playlist failed: " ++ show err
 
     getPlaylist tok = do
-        let rurl = "http://8tracks.com/sets/" ++ playToken tok  ++ "/next.json"
+        let rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/next.json"
             query = [ ("mix_id", C.pack $ show $ mixId tok) ]
 
         initReq <- parseUrl rurl
@@ -122,7 +116,7 @@ instance Radio.Radio EightTracks where
         res <- withManager $ \manager -> httpLbs req manager
         print $ responseBody res
       where
-        rurl = "http://8tracks.com/sets/" ++ playToken tok ++ "/report.json"
+        rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok) ++ "/report.json"
         query = [ ("track_id", C.pack $ show $ id x)
                 , ("mix_id", C.pack $ show $ mixId tok) ]
 
@@ -139,7 +133,8 @@ instance NeedLogin EightTracks where
         case eitherDecode $ responseBody res of
             Right r  -> do
                 pTok <- newPlayToken
-                return $ Just $ Token (U.user_token $ U.user r) pTok mId
+                return $ Just $ Token (U.user_token $ U.user r)
+                                      (U.login $ U.user r) pTok mId
             Left err -> print err >> return Nothing
       where
         rurl = "http://8tracks.com/sessions.json"
@@ -162,17 +157,19 @@ instance NeedLogin EightTracks where
                     Just c -> 
                         case fromJSON c of
                             Success tok -> return $ Just $ (eight tok) { mixId = read mid }
-                            Error err -> error $ "Parse token failed: " ++ show err
+                            Error err -> do
+                                print $ "Parse token failed: " ++ show err
+                                return Nothing
            else return Nothing
 
 instance FromJSON (Radio.Config EightTracks)
 instance ToJSON (Radio.Config EightTracks)
 
-newPlayToken :: IO String
+newPlayToken :: IO Int
 newPlayToken = do
     res <- simpleHttp rurl
     let ses = fromJust (decode res :: Maybe PlaySession)
-    return $ play_token ses
+    return $ read $ play_token ses
   where
     rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey 
 

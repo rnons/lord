@@ -20,7 +20,6 @@ import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad (liftM, when, void)
-import           Data.Aeson (fromJSON, FromJSON, Result(..), Value)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
@@ -73,7 +72,7 @@ class FromJSON a => Radio a where
         case time of
             Right (elapsed, _) ->
                 if elapsed < 30 
-                    then threadDelay (5*10^6) >> reportLoop param x
+                    then threadDelay (5*1000000) >> reportLoop param x
                     else report param x
             Left err -> print err
 
@@ -117,7 +116,7 @@ class FromJSON a => Radio a where
                 writeLog logger $ show e
                 play logger reqData xs
                 )
-        threadDelay (3*10^6)
+        threadDelay (3*1000000)
         mpdLoad m4a
         play logger reqData xs
       where
