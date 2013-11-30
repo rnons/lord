@@ -19,7 +19,6 @@ import           Network.HTTP.Types.Status (status302)
 
 import qualified Radio
 
-type Param a = Radio.Param Cmd
 
 data Cmd = Cmd
     { sc_id :: Int
@@ -42,7 +41,7 @@ instance FromJSON Cmd
 instance Radio.Radio Cmd where
     data Param Cmd = Genre String
 
-    parsePlaylist val = do
+    parsePlaylist val =
         case fromJSON val of
             Success s -> s
             Error err -> error $ "Parse playlist failed: " ++ show err
@@ -64,8 +63,8 @@ instance Radio.Radio Cmd where
         let req = initReq { method = "GET"
                           , queryString = renderQuery False query
                           }
-        E.catch (do withManager $ \manager -> 
-                        httpLbs req { redirectCount = 0 } manager >> return "")
+        E.catch (withManager $ \manager -> 
+                    httpLbs req { redirectCount = 0 } manager >> return "")
                 (\e -> case e of
                     (StatusCodeException s hdr _) ->
                         if s == status302 then redirect hdr 
@@ -116,4 +115,4 @@ pprGenres gs = do
     putStrLn $ foldr1 f (take 4 gs)
     pprGenres $ drop 4 gs
   where
-    f a b = a ++ (concat $ take (20 - length(a)) $ repeat " ") ++ b
+    f a b = a ++ concat (replicate (20 - length a) " ") ++ b

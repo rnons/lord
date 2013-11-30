@@ -40,7 +40,10 @@ data SongMeta = SongMeta
     { artist    :: String
     , album     :: String
     , title     :: String
-    }
+    } 
+
+instance Show SongMeta where
+    show meta = artist meta ++ " - " ++ title meta 
 
 class FromJSON a => Radio a where
     data Param a :: *
@@ -79,96 +82,107 @@ class FromJSON a => Radio a where
     play :: Logger -> Param a -> [a] -> IO ()
     play logger reqData [] = getPlaylist reqData >>= play logger reqData
     play logger reqData (x:xs)
-      | playable x = do
-        surl <- songUrl reqData x
-        print surl
-        when (surl /= "") $ do
-            let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
-            writeLog logger song 
-            getStateFile >>= flip writeFile song
-            -- Report song played if needed
-            when (reportRequired x) $ void (forkIO $ reportLoop reqData x)
-            mpdLoad $ Path $ C.pack surl
-            takeMVar eof                     -- Finished
-        play logger reqData xs
-      | otherwise = do
-        surl <- songUrl reqData x
-        print surl
-        req <- parseUrl surl
-        home <- getLordDir
-        manager <- newManager def
-        forkIO $ E.catch 
-            (do
-                let song = artist (songMeta x) ++ " - " ++ title (songMeta x)
-                writeLog logger song 
-                getStateFile >>= flip writeFile song
-                -- Report song played if needed
-                when (reportRequired x) $ void (forkIO $ reportLoop reqData x)
+      | playable x = loadAndPlay logger reqData (x:xs)
+      | otherwise = downloadAndPlay logger reqData (x:xs)
 
-                runResourceT $ do 
-                    res <- http req manager
-                    responseBody res $$+- sinkFile (home ++ "/lord.m4a")
-                -- This will block until eof.
-
-                putMVar eof ())
-            (\e -> do
-                print (e :: E.SomeException)
-                writeLog logger $ show e
-                play logger reqData xs
-                )
-        threadDelay (3*1000000)
-        mpdLoad m4a
-        play logger reqData xs
-      where
-        m4a = "lord/lord.m4a"
-
-        mpdLoad :: Path -> IO ()
-        mpdLoad path
-          | playable x = do
-            withMPD $ do
-                clear
-                add path
-            withMPD $ MPD.play Nothing
-            mpdPlay
-          | otherwise = do
-            s <- withMPD $ do
-                    clear
-                    update [Path "lord"]
-                    add path
-            case s of
-                Right _ -> do
-                    withMPD $ MPD.play Nothing
-                    mpdPlay
-                _                  -> mpdLoad path
-
-        mpdState :: IO (MPD.Response State)
-        mpdState = do
-            withMPD $ idle [PlayerS]   
-            -- This will block until paused/finished.
-
-            st <- liftM stState <$> withMPD status
-            print st
-            return st
-
-        mpdPlay :: IO ()
+loadAndPlay :: Radio a => Logger -> Param a -> [a] -> IO ()
+loadAndPlay logger reqData [] = 
+    getPlaylist reqData >>= loadAndPlay logger reqData
+loadAndPlay logger reqData (x:xs) = do
+    surl <- songUrl reqData x
+    print surl
+    when (surl /= "") $ do
+        logAndReport logger reqData x
+        mpdLoad $ Path $ C.pack surl
+        takeMVar eof                     -- Finished
+    loadAndPlay logger reqData xs
+  where
+    mpdLoad :: Path -> IO ()
+    mpdLoad path = do
+        withMPD $ do
+            clear
+            add path
+        withMPD $ MPD.play Nothing
         mpdPlay
-          | playable x = do
-            st <- mpdState
-            if st == Right Stopped 
-                then putMVar eof ()
-                else mpdPlay
-          | otherwise = do
-            st <- mpdState
-            bd <- isEmptyMVar eof
-            if st == Right Stopped 
-                then if bd 
-                        then do                              -- Slow Network
-                            withMPD $ MPD.play Nothing
-                            mpdPlay
-                        else do
-                            withMPD clear
-                            takeMVar eof                     -- Finished
-                else mpdPlay                                 -- Pause
+
+    mpdPlay :: IO ()
+    mpdPlay = do
+        st <- mpdState
+        if st == Right Stopped 
+            then putMVar eof ()
+            else mpdPlay
+
+downloadAndPlay :: Radio a => Logger -> Param a -> [a] -> IO ()
+downloadAndPlay logger reqData [] = 
+    getPlaylist reqData >>= downloadAndPlay logger reqData
+downloadAndPlay logger reqData (x:xs) = do
+    surl <- songUrl reqData x
+    print surl
+    req <- parseUrl surl
+    home <- getLordDir
+    manager <- newManager def
+    forkIO $ E.catch 
+        (do
+            logAndReport logger reqData x
+
+            runResourceT $ do 
+                res <- http req manager
+                responseBody res $$+- sinkFile (home ++ "/lord.m4a")
+            -- This will block until eof.
+
+            putMVar eof ())
+        (\e -> do
+            print (e :: E.SomeException)
+            writeLog logger $ show e
+            downloadAndPlay logger reqData xs
+            )
+    threadDelay (3*1000000)
+    mpdLoad m4a
+    downloadAndPlay logger reqData xs
+  where
+    m4a = "lord/lord.m4a"
+
+    mpdLoad :: Path -> IO ()
+    mpdLoad path = do
+        s <- withMPD $ do
+                clear
+                update [Path "lord"]
+                add path
+        case s of
+            Right _ -> do
+                withMPD $ MPD.play Nothing
+                mpdPlay
+            _                  -> mpdLoad path
+
+    mpdPlay :: IO ()
+    mpdPlay = do
+        st <- mpdState
+        bd <- isEmptyMVar eof
+        if st == Right Stopped 
+            then if bd 
+                    then do                              -- Slow Network
+                        withMPD $ MPD.play Nothing
+                        mpdPlay
+                    else do
+                        withMPD clear
+                        takeMVar eof                     -- Finished
+            else mpdPlay                                 -- Pause
+
+logAndReport :: Radio a => Logger -> Param a -> a -> IO ()
+logAndReport logger reqData x = do
+    writeLog logger (show $ songMeta x) 
+    getStateFile >>= flip writeFile (show $ songMeta x)
+    -- Report song played if needed
+    when (reportRequired x) $ void (forkIO $ reportLoop reqData x)
+
+mpdState :: IO (MPD.Response State)
+mpdState = do
+    withMPD $ idle [PlayerS]   
+    -- This will block until paused/finished.
+
+    st <- liftM stState <$> withMPD status
+    print st
+    return st
 
 class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
     login :: String -> IO (Param a)

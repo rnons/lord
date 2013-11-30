@@ -23,7 +23,6 @@ import           Text.XML.Cursor
 
 import qualified Radio
 
-type Param a = Radio.Param Douban
 
 data Douban = Douban 
     { picture :: String
@@ -73,7 +72,7 @@ getPlaylist' query = do
 musicianID :: String -> IO (Maybe String)
 musicianID mname = do
     let rurl = "http://music.douban.com/search/" ++ 
-              (C.unpack $ urlEncode True (C.pack $ encodeString mname))
+              C.unpack (urlEncode True (C.pack $ encodeString mname))
     rsp <- simpleHttp rurl
     let cursor = fromDocument $ parseLBS rsp
         href = cursor $// element "a" 
@@ -174,7 +173,7 @@ search key = search' rurl
   where 
     rurl = "http://douban.fm/j/explore/search?query=" ++ 
           -- encodeString: encode chinese characters
-          (C.unpack $ urlEncode True (C.pack $ encodeString key))
+          C.unpack (urlEncode True (C.pack $ encodeString key))
 
 
 search' :: String -> IO [Channel]

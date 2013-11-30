@@ -41,7 +41,7 @@ verHdr, keyHdr :: Header
 verHdr = (mk "X-Api-Version", "3")
 keyHdr = (mk "X-Api-Key", C.pack apiKey)
 
-type Param a = Radio.Param EightTracks
+type ETParam = Radio.Param EightTracks
 
 data PlaySession = PlaySession
     { play_token            :: String
@@ -101,14 +101,14 @@ instance Radio.Radio EightTracks where
             rurl <- if justStarted
                 then do
                     putMVar running ()
-                    return $ "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/play.json"
+                    return $ "http://8tracks.com/sets/" ++ show (playToken tok) ++ "/play.json"
                 else
-                    return $ "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/next.json"
+                    return $ "http://8tracks.com/sets/" ++ show (playToken tok) ++ "/next.json"
             getPlaylist' rurl)
         (\e -> do
             -- When reached the last track in this mix. Play it again
             print (e :: E.SomeException) 
-            let rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/play.json"
+            let rurl = "http://8tracks.com/sets/" ++ show (playToken tok) ++ "/play.json"
             getPlaylist' rurl)
       where
         usrHdr = (mk "X-User-Token", C.pack $ userToken tok)
@@ -143,12 +143,12 @@ instance Radio.Radio EightTracks where
         res <- withManager $ \manager -> httpLbs req manager
         print $ responseBody res
       where
-        rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok) ++ "/report.json"
+        rurl = "http://8tracks.com/sets/" ++ show (playToken tok) ++ "/report.json"
         query = [ ("track_id", C.pack $ show $ id x)
                 , ("mix_id", C.pack $ show $ mixId tok) ]
 
-instance FromJSON (Radio.Param EightTracks)
-instance ToJSON (Radio.Param EightTracks)
+instance FromJSON ETParam
+instance ToJSON ETParam
 
 instance NeedLogin EightTracks where
     createSession strMixId email pwd = do
@@ -168,9 +168,9 @@ instance NeedLogin EightTracks where
         query = [ ("login", C.pack email), ("password", C.pack pwd) ]
         mId = read strMixId :: Int
 
-    data Config EightTracks = Config { eight :: Radio.Param EightTracks } deriving Generic
+    data Config EightTracks = Config { eight :: ETParam } deriving Generic
 
-    mkConfig tok = Config tok
+    mkConfig = Config
 
     readToken mid = do
         home <- Radio.getLordDir

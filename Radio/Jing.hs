@@ -28,7 +28,7 @@ import           System.Directory (doesFileExist)
 
 import Radio
 
-type Param a = Radio.Param Jing
+type JingParam = Radio.Param Jing
 
 data Jing = Jing 
     { abid :: Int       -- album id
@@ -127,8 +127,8 @@ instance Radio.Radio Jing where
     
     playable _ = False
 
-instance FromJSON (Radio.Param Jing)
-instance ToJSON (Radio.Param Jing)
+instance FromJSON JingParam
+instance ToJSON JingParam
 
 instance NeedLogin Jing where
     createSession keywords email pwd = do
@@ -140,7 +140,7 @@ instance NeedLogin Jing where
         let hmap = HM.fromList $ responseHeaders res
             atoken = HM.lookup "Jing-A-Token-Header" hmap
             rtoken = HM.lookup "Jing-R-Token-Header" hmap
-            parseToken :: Value -> Maybe (Radio.Param Jing)
+            parseToken :: Value -> Maybe JingParam
             parseToken (Object hm) = do
                 let user = HM.lookup "result" hm >>= 
                            \(Object hm') -> HM.lookup "usr" hm'
@@ -155,9 +155,9 @@ instance NeedLogin Jing where
             parseToken _ = error "Unrecognized token format."
         liftM parseToken (runResourceT $ responseBody res $$+- sinkParser json)
 
-    data Config Jing = Config { jing :: Radio.Param Jing } deriving Generic
+    data Config Jing = Config { jing :: JingParam } deriving Generic
 
-    mkConfig tok = Config tok
+    mkConfig = Config 
 
     readToken keywords = do
         home <- Radio.getLordDir

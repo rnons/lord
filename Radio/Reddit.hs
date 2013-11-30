@@ -15,8 +15,6 @@ import           Network.HTTP.Conduit
 
 import qualified Radio
 
-type Param a = Radio.Param Reddit
-
 data Reddit = Reddit
     { title         :: String
     , artist        :: String
@@ -61,4 +59,4 @@ pprGenres gs = do
     putStrLn $ foldr1 f (take 4 gs)
     pprGenres $ drop 4 gs
   where
-    f a b = a ++ (concat $ take (20 - length(a)) $ repeat " ") ++ b
+    f a b = a ++ concat (replicate (20 - length a) " ") ++ b
