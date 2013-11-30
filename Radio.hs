@@ -26,7 +26,7 @@ import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
 import           Data.Yaml
 import           Network.HTTP.Conduit hiding (path)
-import           Network.MPD hiding (play, Value)
+import           Network.MPD hiding (play, pause, Value)
 import qualified Network.MPD as MPD
 import           System.Directory (doesFileExist, getHomeDirectory)
 import           System.IO
@@ -34,37 +34,9 @@ import           System.IO.Unsafe (unsafePerformIO)
 import           System.Log.FastLogger
 import           System.Process
 
+
 eof :: MVar ()
 eof = unsafePerformIO newEmptyMVar
-
-data MpState = MpState
-    { readh     :: MVar Handle
-    , writeh    :: MVar Handle
-    , mpHdl     :: MVar ProcessHandle
-    , ended     :: MVar ()
-    }
-
-emptySt :: MpState
-emptySt = MpState
-    { readh     = unsafePerformIO newEmptyMVar
-    , writeh    = unsafePerformIO newEmptyMVar
-    , mpHdl     = unsafePerformIO newEmptyMVar
-    , ended     = unsafePerformIO newEmptyMVar
-    }
-
-mplayerState :: MVar MpState
-mplayerState = unsafePerformIO $ newMVar emptySt
-
-getsST :: (MpState -> a) -> IO a
-getsST f = withST (return . f)
-
--- | Perform a (read-only) IO action on the state
-withST :: (MpState -> IO a) -> IO a
-withST f = readMVar mplayerState >>= f
-
--- | Modify the state with a pure function
-silentlyModifyST :: (MpState -> MpState) -> IO ()
-silentlyModifyST  f = modifyMVar_ mplayerState (return . f)
 
 data SongMeta = SongMeta 
     { artist    :: String
@@ -110,16 +82,11 @@ class FromJSON a => Radio a where
             Left err -> print err
 
     play :: Logger -> Param a -> [a] -> IO ()
-    play logger reqData [] = getPlaylist reqData >>= play logger reqData
-    play logger reqData (x:xs) = do
+    play logger reqData xxs = do
         st <- withMPD status
         case st of
-            Right _ -> playWithMPD logger reqData (x:xs)
-            Left  _ -> do
-                -- initialize mplayer as early as possible
-                forkIO mplayerInit
-                forkIO mplayerWait
-                playWithMplayer logger reqData (x:xs)
+            Right _ -> playWithMPD logger reqData xxs
+            Left  _ -> playWithMplayer logger reqData xxs
 
 playWithMPD :: Radio a => Logger -> Param a -> [a] -> IO ()
 playWithMPD logger reqData [] = 
@@ -218,50 +185,9 @@ playWithMplayer logger reqData (x:xs) = do
     surl <- songUrl reqData x
     when (surl /= "") $ do
         logAndReport logger reqData x
-        let input = "loadfile " ++ surl
-        mplayerSend input
-        e <- getsST ended
-        takeMVar e      -- block until current song finished playing
+        let sh = "mplayer -cache 2048 -cache-min 5 -novideo " ++ surl
+        void $ waitForProcess =<< runCommand sh
     playWithMplayer logger reqData xs
-
--- mplayer slave mode protocol:
--- http://www.mplayerhq.hu/DOCS/tech/slave.txt
-mplayerInit :: IO ()
-mplayerInit = do
-    let sh = "mplayer -msglevel global=6:statusline=6 -slave -idle -really-quiet -cache 2048 -cache-min 5 -novideo"
-    (Just hin, Just hout, Just herr, hdl) <-
-        createProcess (shell sh){ std_in = CreatePipe
-                                , std_out = CreatePipe
-                                , std_err = CreatePipe }
-    mhin <- newMVar hin
-    mhout <- newMVar hout
-    mhdl <- newMVar hdl
-    silentlyModifyST $ \st -> st { writeh = mhin
-                                 , readh = mhout
-                                 , mpHdl = mhdl }
-    waitForProcess hdl
-    hClose herr
-
--- | If song endded or skipped, putMVar.
-mplayerWait :: IO ()
-mplayerWait = do
-    hout <- getsST readh >>= readMVar
-    line <- hGetLine hout           -- consume hout to prevent overflow
-    case line of
-         "EOF code: 1  " -> do      -- song end
-             e <- getsST ended
-             putMVar e ()
-         "EOF code: 4  " -> do      -- next song
-             e <- getsST ended
-             putMVar e ()
-         _ -> return ()
-    mplayerWait
-
-mplayerSend :: String -> IO ()
-mplayerSend msg = withST $ \st -> do
-    hin <- readMVar (writeh st)
-    hPutStrLn hin msg
-    hFlush hin
 
 logAndReport :: Radio a => Logger -> Param a -> a -> IO ()
 logAndReport logger reqData x = do
