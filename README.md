@@ -14,7 +14,10 @@ lord -h
 lord status
 lord kill
 
-lord cmd listen [<genre>] [--no-daemon]
+lord 8tracks listen <mix_id> [--no-daemon]
+lord 8tracks search <keywords>
+
+lord cmd listen <genre> [--no-daemon]
 lord cmd genres
 
 lord douban listen [<channel_id> | <musician>] [--no-daemon]
@@ -24,7 +27,7 @@ lord douban trending
 
 lord jing listen <keywords> [--no-daemon]
 
-lord reddit listen [<genre>] [--no-daemon]
+lord reddit listen <genre> [--no-daemon]
 lord reddit genres
 ```
 

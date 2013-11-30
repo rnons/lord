@@ -5,8 +5,9 @@ import Test.HUnit
 
 import Radio
 import qualified Radio.Cmd as Cmd
-import Radio.Jing
+import qualified Radio.EightTracks as ET
 import Radio.Douban
+import Radio.Jing
 import qualified Radio.Reddit as Reddit
 
 
@@ -29,8 +30,13 @@ spec = do
             ss <- Radio.getPlaylist (Musician "Sigur RóS")
             assert $ length ss > 0
 
-        it "jing" $ do
-            tok <- readToken "postrock"
+        it "8tracks: given mix id" $ do
+            tok <- readToken "14" :: IO (Maybe (Radio.Param ET.EightTracks))
+            ss <- Radio.getPlaylist $ fromJust tok
+            assert $ length ss > 0
+
+        it "jing: given keywords" $ do
+            tok <- readToken "postrock" :: IO (Maybe (Radio.Param Jing))
             ss <- Radio.getPlaylist $ fromJust tok
             assert $ length ss > 0
 
