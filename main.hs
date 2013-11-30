@@ -226,14 +226,22 @@ listen nodaemon param = do
     -- Make sure ~/.lord exists
     getLordDir >>= createDirectoryIfMissing False
 
+    -- mplayer backend won't work in daemon mode!
+    st <- withMPD status
+    nodaemon' <- case st of 
+                     Right _ -> return nodaemon
+                     Left  e -> print e >> 
+                                putStrLn "Lord will run in foreground" >>
+                                return True
+
     pid <- getPidFile
-    logger <- if nodaemon then mkLogger True stdout 
+    logger <- if nodaemon' then mkLogger True stdout 
               else getLogFile >>= flip openFile AppendMode >>= mkLogger True
     let listen' = play logger param []
     running <- isRunning pid
     when running $ killAndWait pid 
-    if nodaemon then runInForeground pid listen'
-                else runDetached (Just pid) def listen'
+    if nodaemon' then runInForeground pid listen'
+                 else runDetached (Just pid) def listen'
 
 -- Partially taken from System.Posix.Daemon module
 runInForeground :: FilePath -> IO () -> IO ()
