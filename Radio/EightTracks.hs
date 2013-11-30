@@ -4,9 +4,12 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Module of http://8tracks.com
+-- API documentation: http://8tracks.com/developers/api_v3
 module Radio.EightTracks where
 
+import qualified Control.Exception as E
 import           Control.Monad (forM_, liftM)
+import           Control.Concurrent.MVar
 import           Data.Aeson
 import           Data.Aeson.Types (defaultOptions, Options(..))
 import qualified Data.ByteString.Char8 as C
@@ -21,11 +24,15 @@ import           Network.HTTP.Conduit
 import           Prelude hiding (id)
 import           System.Console.ANSI
 import           System.Directory (doesFileExist)
+import           System.IO.Unsafe (unsafePerformIO)
 
 import Radio
 import qualified Radio.EightTracks.Explore as Exp
 import qualified Radio.EightTracks.User as U
 
+
+running :: MVar ()
+running = unsafePerformIO newEmptyMVar
 
 apiKey :: String
 apiKey = "1de30eb2b8fe85b1740cfbee3fdbb928e2c7249b"
@@ -86,16 +93,35 @@ instance Radio.Radio EightTracks where
             Success s -> [track $ mix_set s]
             Error err -> error $ "Parse playlist failed: " ++ show err
 
-    getPlaylist tok = do
-        let rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/next.json"
-            query = [ ("mix_id", C.pack $ show $ mixId tok) ]
+    -- Request play.json will record current mix to listening history.
+    -- Request next.json won't.
+    getPlaylist tok = E.catch
+        (do
+            justStarted <- isEmptyMVar running
+            rurl <- if justStarted
+                then do
+                    putMVar running ()
+                    return $ "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/play.json"
+                else
+                    return $ "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/next.json"
+            getPlaylist' rurl)
+        (\e -> do
+            -- When reached the last track in this mix. Play it again
+            print (e :: E.SomeException) 
+            let rurl = "http://8tracks.com/sets/" ++ (show $ playToken tok)  ++ "/play.json"
+            getPlaylist' rurl)
+      where
+        usrHdr = (mk "X-User-Token", C.pack $ userToken tok)
 
-        initReq <- parseUrl rurl
-        let req = initReq { requestHeaders = [verHdr, keyHdr] 
-                          , queryString = renderSimpleQuery False query }
-        withManager $ \manager -> do
-            res <- http req manager
-            liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
+        getPlaylist' rurl = do
+            let query = [ ("mix_id", C.pack $ show $ mixId tok) ]
+
+            initReq <- parseUrl rurl
+            let req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr] 
+                              , queryString = renderSimpleQuery False query }
+            withManager $ \manager -> do
+                res <- http req manager
+                liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
 
     songUrl _ x = return $ track_file_stream_url x
 
@@ -107,7 +133,8 @@ instance Radio.Radio EightTracks where
 
     reportRequired _ = True
 
-    -- At 30 seconds, report song played
+    -- From api-doc: In order to be legal and pay royalties properly,
+    -- at 30 seconds, report song played
     report tok x = do
         initReq <- parseUrl rurl
         let usrHdr = (mk "X-User-Token", C.pack $ userToken tok)
