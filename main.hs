@@ -85,6 +85,9 @@ optParser = Options
 
 main :: IO ()
 main = do
+    -- Make sure ~/.lord exists
+    getLordDir >>= createDirectoryIfMissing False
+
     o <- execParser' $ info (helper <*> optParser) 
                            (fullDesc <> header "Lord: radio commander")
     let nodaemon = optDaemon o
@@ -232,9 +235,6 @@ jingListen nodaemon k = do
 
 listen :: Radio a => Bool -> Radio.Param a -> IO ()
 listen nodaemon param = do
-    -- Make sure ~/.lord exists
-    getLordDir >>= createDirectoryIfMissing False
-
     -- mplayer backend won't work in daemon mode!
     st <- withMPD status
     nodaemon' <- case st of 

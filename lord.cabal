@@ -1,8 +1,8 @@
 name:                lord
-version:             1.20131130
+version:             2.20131201
 synopsis:            A command line interface to online radios.
 description:         
-    A unified interface to several online radio service providers, use @mpd@ (<http://musicpd.org>) as backend.
+    A unified command line interface to several online radios, use @mpd@ (<http://musicpd.org>) as backend by default. Will fallback to mplayer (http://www.mplayerhq.hu) when mpd is unavailable.
     .
     Supported radios:
     .
@@ -22,16 +22,16 @@ description:
     > lord status
     > lord kill
     >
-    > lord 8tracks listen <mix_id> [--no-daemon]
+    > lord 8tracks listen [<mix_id> | <mix_url>] [--no-daemon]
     > lord 8tracks search <keywords>
+    > lord 8tracks [featured | trending | newest]
     >
     > lord cmd listen <genre> [--no-daemon]
     > lord cmd genres
     >
     > lord douban listen [<channel_id> | <musician>] [--no-daemon]
     > lord douban search <keywords>
-    > lord douban hot
-    > lord douban trending
+    > lord douban [hot | trending]
     >
     > lord jing listen <keywords> [--no-daemon]
     >
