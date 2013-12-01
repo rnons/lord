@@ -5,12 +5,16 @@ import           Data.Aeson   (FromJSON)
 import           GHC.Generics (Generic)
 
 data Mix = Mix
-    { id        :: Int
-    , path      :: String
-    , web_path  :: String
-    , name      :: String
-    , description :: String
-    , tag_list_cache :: String
+    { id            :: Int
+    , path          :: String
+    , web_path      :: String
+    , name          :: String
+    , description   :: String
+    , plays_count   :: Int
+    , likes_count   :: Int
+    , tag_list_cache:: String
+    , duration      :: Int
+    , tracks_count  :: Int
     } deriving (Show, Generic)
 
 instance FromJSON Mix

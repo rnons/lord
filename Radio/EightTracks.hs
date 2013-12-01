@@ -18,7 +18,7 @@ import           Data.Yaml hiding (decode)
 import           Data.CaseInsensitive (mk)
 import           Data.Char (isDigit)
 import           Data.Conduit (($$+-))
-import           Data.Conduit.Attoparsec (sinkParser)
+import           Data.Conduit.Attoparsec (sinkParser, ParseError)
 import qualified Data.List as L
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
@@ -226,8 +226,10 @@ search :: String -> IO [Exp.Mix]
 search [] = return []
 search key = smartGet $ "keyword:" ++ key
 
-trending :: IO [Exp.Mix]
+featured, trending, newest :: IO [Exp.Mix]
+featured = smartGet "collection:homepage"
 trending = smartGet "all"
+newest   = smartGet "all:recent"
 
 pprMixes :: [Exp.Mix] -> IO ()
 pprMixes mixes =
@@ -235,9 +237,13 @@ pprMixes mixes =
         setSGR [SetConsoleIntensity BoldIntensity]
         putStr $ "* " ++ Exp.name m 
         setSGR [SetColor Foreground Vivid Green]
-        putStrLn $ " id=" ++ show (Exp.id m)
+        putStr $ " id=" ++ show (Exp.id m)
+        putStr $ "  ▶" ++ show (Exp.plays_count m)
+        putStr $ "  ♥" ++ show (Exp.likes_count m)
+        putStrLn $ "  (" ++ show (Exp.tracks_count m) ++ " tracks)"
         setSGR [Reset]
-        putStrLn $ "    Description: " ++ Exp.description m
+        putStrLn $ "    Description: " ++ 
+                   unlines (map ("    " ++) (lines $ Exp.description m))
         putStrLn $ "    Tags: " ++ Exp.tag_list_cache m
         putStrLn ""
         )
@@ -246,14 +252,22 @@ get :: FromJSON a => String -> (a -> b) -> IO b
 get rurl selector = do
     initReq <- parseUrl rurl
     let req = initReq { requestHeaders = [verHdr, keyHdr] }
-    val <- withManager $ \manager -> do
-        res <- http req manager
-        responseBody res $$+- sinkParser json
+    val <- E.catches 
+        (withManager $ \manager -> do
+            res <- http req manager
+            responseBody res $$+- sinkParser json)
+        [ E.Handler (\e -> print (e :: ParseError) >>
+           error "The mix you are trying to access may be private.")
+        , E.Handler (\e -> case e of
+                        (StatusCodeException s _ _) ->
+                            error $ show s
+                        otherException ->
+                            error $ show otherException) 
+        ]
 
     case fromJSON val of
         Success v -> return $ selector v
         Error err -> error err
-
 
 getMixId :: String -> IO Int
 getMixId m

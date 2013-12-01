@@ -49,6 +49,9 @@ data DoubanSubCommand = DoubanListen String
     deriving (Eq, Show)
 
 data ETSubCommand = ETListen String
+                  | ETFeatured
+                  | ETTrending
+                  | ETNewest
                   | ETSearch String
     deriving (Eq, Show)
 
@@ -99,6 +102,9 @@ main = do
         EightTracks subCommand ->
             case subCommand of
                 ETListen mId -> etListen nodaemon mId
+                ETFeatured   -> ET.featured >>= ET.pprMixes
+                ETTrending   -> ET.trending >>= ET.pprMixes
+                ETNewest     -> ET.newest   >>= ET.pprMixes
                 ETSearch key -> etSearch key
         JingFM (JingListen key) -> jingListen nodaemon key
         RedditFM subCommand ->
@@ -159,6 +165,9 @@ etOptions = EightTracks <$> subparser
     ( command "listen"
         (info (helper <*> (ETListen <$> argument str (metavar "mix id")))
               (progDesc "Provide mix id to listen to 8tracks.com"))
+    <> command "featured" (info (pure ETFeatured) (progDesc "Featured mixes"))
+    <> command "trending" (info (pure ETFeatured) (progDesc "Trending mixes"))
+    <> command "newest" (info (pure ETFeatured) (progDesc "Newest mixes"))
     <> command "search"
         (info (helper <*> (ETSearch <$> argument str (metavar "KEYWORDS")))
               (progDesc "search mixes"))
