@@ -215,23 +215,19 @@ newPlayToken = do
   where
     rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey 
 
+smartUrl :: String -> String
+smartUrl smartId = 
+    "http://8tracks.com/mix_sets/" ++ smartId ++ ".json?include=mixes"
+
+smartGet :: String -> IO [Exp.Mix]
+smartGet smartId = get (smartUrl smartId) (Exp.mixes . Exp.mix_set)
+
 search :: String -> IO [Exp.Mix]
 search [] = return []
-search key = search' rurl
-  where 
-    rurl = "http://8tracks.com/mix_sets/keyword:" ++ key ++ ".json?include=mixes"
+search key = smartGet $ "keyword:" ++ key
 
-search' :: String -> IO [Exp.Mix]
-search' rurl = do
-    initReq <- parseUrl rurl
-    let req = initReq { requestHeaders = [verHdr, keyHdr] }
-    val <- withManager $ \manager -> do
-        res <- http req manager
-        responseBody res $$+- sinkParser json
-
-    case fromJSON val of
-        Success v -> return $ Exp.mixes $ Exp.mix_set v
-        Error err -> putStrLn err >> return []
+trending :: IO [Exp.Mix]
+trending = smartGet "all"
 
 pprMixes :: [Exp.Mix] -> IO ()
 pprMixes mixes =
@@ -246,8 +242,8 @@ pprMixes mixes =
         putStrLn ""
         )
 
-get :: FromJSON a => String -> IO a
-get rurl = do
+get :: FromJSON a => String -> (a -> b) -> IO b
+get rurl selector = do
     initReq <- parseUrl rurl
     let req = initReq { requestHeaders = [verHdr, keyHdr] }
     val <- withManager $ \manager -> do
@@ -255,7 +251,7 @@ get rurl = do
         responseBody res $$+- sinkParser json
 
     case fromJSON val of
-        Success v -> return v
+        Success v -> return $ selector v
         Error err -> error err
 
 
@@ -267,8 +263,7 @@ getMixId m
                      then m
                      else (domain ++)
                           (if "/" `L.isPrefixOf` m then m else '/' : m)
-    mix <- get (mixUrl ++ ".json")
-    return $ Exp.id $ info_mix mix
+    get (mixUrl ++ ".json") (Exp.id . info_mix)
   where
     isNumerical = and . fmap isDigit
     domain = "http://8tracks.com"
