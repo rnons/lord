@@ -71,7 +71,7 @@ getPlaylist' query = do
 
 musicianID :: String -> IO (Maybe String)
 musicianID mname = do
-    let rurl = "http://music.douban.com/search/" ++ 
+    let rurl = "http://music.douban.com/subject_search/?search_text=" ++ 
               C.unpack (urlEncode True (C.pack $ encodeString mname))
     rsp <- simpleHttp rurl
     let cursor = fromDocument $ parseLBS rsp
