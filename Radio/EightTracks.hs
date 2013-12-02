@@ -13,7 +13,7 @@ import           Control.Concurrent.MVar
 import           Data.Aeson
 import           Data.Aeson.Types (defaultOptions, Options(..))
 import qualified Data.ByteString.Char8 as C
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromMaybe, fromJust)
 import           Data.Yaml hiding (decode)
 import           Data.CaseInsensitive (mk)
 import           Data.Char (isDigit)
@@ -79,7 +79,7 @@ data EightTracks = EightTracks
     , track_file_stream_url :: String
     , name                  :: String
     , performer             :: String
-    , release_name          :: String
+    , release_name          :: Maybe String
     , url                   :: String
     } deriving (Show, Generic)
 instance FromJSON EightTracks
@@ -139,7 +139,8 @@ instance Radio.Radio EightTracks where
 
     songUrl _ x = return $ track_file_stream_url x
 
-    songMeta x = Radio.SongMeta (performer x) (release_name x) (name x)
+    songMeta x = Radio.SongMeta (performer x) 
+                                (fromMaybe "" $ release_name x) (name x)
 
     tagged _ = False
     
