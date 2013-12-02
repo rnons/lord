@@ -17,14 +17,12 @@ import qualified Data.ByteString.Char8 as C
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
-import           Data.Yaml
 import           Data.CaseInsensitive (mk)
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
-import           System.Directory (doesFileExist)
 
 import Radio
 
@@ -159,20 +157,7 @@ instance NeedLogin Jing where
 
     mkConfig = Config 
 
-    readToken keywords = do
-        home <- Radio.getLordDir
-        let yml = home ++ "/lord.yml"
-        exist <- doesFileExist yml
-        if exist
-           then do
-                conf <- decodeFile yml
-                case conf of
-                    Nothing -> error $ "Invalid YAML file: " ++ show conf
-                    Just c -> 
-                        case fromJSON c of
-                            Success tok -> return $ Just $ (jing tok) { cmbt = keywords }
-                            Error err -> error $ "Parse token failed: " ++ show err
-           else return Nothing
+    mkParam param key = param { cmbt = key }
 
 instance FromJSON (Radio.Config Jing)
 instance ToJSON (Radio.Config Jing)

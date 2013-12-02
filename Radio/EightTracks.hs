@@ -14,7 +14,6 @@ import           Data.Aeson
 import           Data.Aeson.Types (defaultOptions, Options(..))
 import qualified Data.ByteString.Char8 as C
 import           Data.Maybe (fromMaybe, fromJust)
-import           Data.Yaml hiding (decode)
 import           Data.CaseInsensitive (mk)
 import           Data.Char (isDigit)
 import           Data.Conduit (($$+-))
@@ -25,7 +24,6 @@ import           Network.HTTP.Types
 import           Network.HTTP.Conduit
 import           Prelude hiding (id)
 import           System.Console.ANSI
-import           System.Directory (doesFileExist)
 import           System.IO.Unsafe (unsafePerformIO)
 
 import Radio
@@ -187,23 +185,7 @@ instance NeedLogin EightTracks where
 
     mkConfig = Config
 
-    readToken strMixId = do
-        mId <- getMixId strMixId
-        home <- Radio.getLordDir
-        let yml = home ++ "/lord.yml"
-        exist <- doesFileExist yml
-        if exist
-           then do
-                conf <- decodeFile yml
-                case conf of
-                    Nothing -> error $ "Invalid YAML file: " ++ show conf
-                    Just c -> 
-                        case fromJSON c of
-                            Success tok -> return $ Just $ (eight tok) { mixId = mId }
-                            Error err -> do
-                                print $ "Parse token failed: " ++ show err
-                                return Nothing
-           else return Nothing
+    mkParam param key = param { mixId = read key }
 
 instance FromJSON (Radio.Config EightTracks)
 instance ToJSON (Radio.Config EightTracks)

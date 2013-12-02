@@ -20,6 +20,7 @@ import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import qualified Control.Exception as E
 import           Control.Monad (liftM, when, void)
+import           Data.Aeson hiding (encode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
@@ -245,7 +246,27 @@ class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
         B.writeFile yml $ B.append bs (encode config)
         putStrLn $ "Your token has been saved to " ++ yml
 
-    readToken :: String -> IO (Maybe (Param a))
+    mkParam :: Param a -> String -> Param a
+
+    readToken :: FromJSON (Config a)
+              => (Config a -> Param a) -> String -> IO (Maybe (Param a))
+    readToken selector keywords = do
+        home <- Radio.getLordDir
+        let yml = home ++ "/lord.yml"
+        exist <- doesFileExist yml
+        if exist
+           then do
+                conf <- decodeFile yml
+                case conf of
+                    Nothing -> error $ "Invalid YAML file: " ++ show conf
+                    Just c -> 
+                        case fromJSON c of
+                            Success tok -> return $ Just $ 
+                                mkParam (selector tok) keywords
+                            Error err -> do
+                                print $ "Parse token failed: " ++ show err
+                                return Nothing
+           else return Nothing
 
 getLordDir :: IO FilePath
 getLordDir = (++ "/.lord") <$> getHomeDirectory

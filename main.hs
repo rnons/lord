@@ -210,7 +210,8 @@ douban k
 
 etListen :: Bool -> Keywords -> IO ()
 etListen nodaemon k = do
-    tok <- readToken k
+    mId <- ET.getMixId k
+    tok <- readToken ET.eight $ show mId
     case tok of
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ ET.userName tok'
@@ -224,7 +225,7 @@ etSearch key = ET.search key >>= ET.pprMixes
 
 jingListen :: Bool -> Keywords -> IO ()
 jingListen nodaemon k = do
-    tok <- readToken k
+    tok <- readToken jing k
     case tok of
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
