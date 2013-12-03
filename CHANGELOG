@@ -1,4 +1,16 @@
 CHANGELOG
 
+2.20131201 -> 2.20131203
+  - Bug fixes
+
+1.20131130 -> 2.20131201
+  - Fallback to mplayer when mpd is unavailable
+
+1.20131124 -> 1.20131130
+  - Added support to http://8tracks.com
+
+1.20131115 -> 1.20131124
+  - Updated "other-modules" field in cabalfile, installable now.
+
 1.20130928 -> 1.20131115
   - Added support to http://radioreddit.com
