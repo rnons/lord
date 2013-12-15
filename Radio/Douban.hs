@@ -12,6 +12,7 @@ import           Data.Char (isDigit)
 import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.HashMap.Strict as HM
+import           Data.List (isPrefixOf)
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Network.HTTP.Conduit
@@ -69,8 +70,8 @@ getPlaylist' query = do
         res <- http req manager
         liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
 
-musicianID :: String -> IO (Maybe String)
-musicianID mname = do
+musicianId :: String -> IO (Maybe String)
+musicianId mname = do
     let rurl = "http://music.douban.com/subject_search/?search_text=" ++ 
               C.unpack (urlEncode True (C.pack $ encodeString mname))
     rsp <- simpleHttp rurl
@@ -80,8 +81,21 @@ musicianID mname = do
                       &|  attribute "href"
     return $ Just $ filter isDigit $ T.unpack $ head $ head href
 
+albumPlayable :: Int -> IO Bool
+albumPlayable aId = do
+    res <- simpleHttp $ aPattern ++ show aId
+    let cursor = fromDocument $ parseLBS res
+        start_radio = cursor $// element "div"
+                             >=> attributeIs "class" "start_radio"
+    return $ not $ null start_radio
+  where
+    aPattern = "http://music.douban.com/subject/"
+
 instance Radio.Radio Douban  where
-    data Param Douban = Cid Int | Musician String
+    data Param Douban = ChannelId Int 
+                      | Album Int
+                      | MusicianId Int 
+                      | MusicianName String
 
     -- TODO: those without ssid filed are ads, filter them out!
     parsePlaylist (Object hm) = do
@@ -91,20 +105,31 @@ instance Radio.Radio Douban  where
              Error _   -> []
     parsePlaylist _ = error "Unrecognized playlist format."
 
-    getPlaylist (Cid cid) = do
+    getPlaylist (ChannelId cid) = do
         let query = [ ("type", Just "n")
                     , ("channel", Just $ C.pack $ show cid)
                     , ("from", Just "lord")
                     ]
         getPlaylist' query
-    getPlaylist (Musician mname) = do
-        mId <- musicianID mname
+    getPlaylist (Album aId) = do
+        playable <- albumPlayable aId
         let query = [ ("type", Just "n")
                     , ("channel", Just "0")
-                    , ("context", Just $ C.pack ("channel:0|musician_id:" ++ fromJust mId))
+                    , ("context", Just $ C.pack ("channel:0|subject_id:" ++ show aId))
+                    , ("from", Just "lord")
+                    ]
+        if playable then getPlaylist' query
+                    else error "This album can not be played."
+    getPlaylist (MusicianId mid) = do
+        let query = [ ("type", Just "n")
+                    , ("channel", Just "0")
+                    , ("context", Just $ C.pack ("channel:0|musician_id:" ++ show mid))
                     , ("from", Just "lord")
                     ]
         getPlaylist' query
+    getPlaylist (MusicianName mname) = do
+        mmid <- musicianId mname
+        Radio.getPlaylist (MusicianId $ read $ fromJust mmid)
 
     songUrl _ x = return $ url x
 
@@ -189,3 +214,14 @@ search' rurl = do
     case channels of
         Success c -> return c
         Error err -> putStrLn err >> print resData >> return []
+
+douban :: String -> Radio.Param Douban
+douban k
+    | isChId k = ChannelId $ read k
+    | aPattern `isPrefixOf` k = Album $ read $ init $ drop (length aPattern) k
+    | mPattern `isPrefixOf` k = MusicianId $ read $ init $ drop (length mPattern) k
+    | otherwise = MusicianName k
+  where
+    isChId = and . fmap isDigit
+    aPattern = "http://music.douban.com/subject/"
+    mPattern = "http://music.douban.com/musician/"

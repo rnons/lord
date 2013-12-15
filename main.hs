@@ -1,6 +1,5 @@
 import           Control.Monad (when)
 import qualified Data.ByteString.Char8 as C
-import           Data.Char (isDigit)
 import           Data.Default (def)
 import           GHC.IO.FD (openFile, stdout)
 import           Network.MPD (withMPD, clear, status, stState)
@@ -154,7 +153,8 @@ cmdOptions = CmdFM <$> subparser
 doubanOptions :: Parser Command
 doubanOptions = DoubanFM <$> subparser 
     ( command "listen" 
-        (info (helper <*> (DoubanListen <$> argument str (metavar "[<channel_id> | <musician>]")))
+        (info (helper <*> (DoubanListen <$> argument str (
+                  metavar "[<channel_id> | <album_url> | <muscian_url> | <musician_name>]")))
               (progDesc "Provide cid/musician to listen to douban.fm"))
     <> command "search" 
         (info (helper <*> (DoubanSearch <$> argument str (metavar "KEYWORDS")))
@@ -201,13 +201,6 @@ doubanTrending = trending >>= pprChannels
 
 doubanSearch :: String -> IO ()
 doubanSearch key = search key >>= pprChannels
-
-douban :: Keywords -> Radio.Param Douban
-douban k
-    | isChId k = Cid $ read k
-    | otherwise = Musician k
-  where
-    isChId = and . fmap isDigit
 
 etListen :: Bool -> Keywords -> IO ()
 etListen nodaemon k = do
