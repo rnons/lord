@@ -21,11 +21,19 @@ spec = describe "getPlaylist" $ do
         assertNotNull ss
 
     it "douban: given channel id" $ do
-        ss <- getPlaylist (Cid 6)
+        ss <- getPlaylist $ douban "6"
+        assertNotNull ss
+
+    it "douban: given album url" $ do
+        ss <- getPlaylist $ douban "http://music.douban.com/subject/3044758/"
+        assertNotNull ss
+
+    it "douban: given musician url" $ do
+        ss <- getPlaylist $ douban "http://music.douban.com/musician/104585/"
         assertNotNull ss
 
     it "douban: given musician name" $ do
-        ss <- getPlaylist (Musician "Sigur RóS")
+        ss <- getPlaylist $ douban "Sigur RóS"
         assertNotNull ss
 
     it "8tracks: given mix id" $ do

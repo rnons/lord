@@ -91,6 +91,14 @@ albumPlayable aId = do
   where
     aPattern = "http://music.douban.com/subject/"
 
+mkQuery :: Int -> String -> Query
+mkQuery cid context = 
+    [ ("type", Just "n")
+    , ("channel", Just $ C.pack $ show cid)
+    , ("context", Just $ C.pack context)
+    , ("from", Just "lord")
+    ]
+
 instance Radio.Radio Douban  where
     data Param Douban = ChannelId Int 
                       | Album Int
@@ -105,28 +113,14 @@ instance Radio.Radio Douban  where
              Error _   -> []
     parsePlaylist _ = error "Unrecognized playlist format."
 
-    getPlaylist (ChannelId cid) = do
-        let query = [ ("type", Just "n")
-                    , ("channel", Just $ C.pack $ show cid)
-                    , ("from", Just "lord")
-                    ]
-        getPlaylist' query
+    getPlaylist (ChannelId cid) = getPlaylist' $ mkQuery cid ""
     getPlaylist (Album aId) = do
         playable <- albumPlayable aId
-        let query = [ ("type", Just "n")
-                    , ("channel", Just "0")
-                    , ("context", Just $ C.pack ("channel:0|subject_id:" ++ show aId))
-                    , ("from", Just "lord")
-                    ]
-        if playable then getPlaylist' query
+        if playable then getPlaylist' $ 
+                         mkQuery 0 $ "channel:0|subjetc_id:" ++ show aId
                     else error "This album can not be played."
-    getPlaylist (MusicianId mid) = do
-        let query = [ ("type", Just "n")
-                    , ("channel", Just "0")
-                    , ("context", Just $ C.pack ("channel:0|musician_id:" ++ show mid))
-                    , ("from", Just "lord")
-                    ]
-        getPlaylist' query
+    getPlaylist (MusicianId mid) = 
+        getPlaylist' $ mkQuery 0 $ "channel:0|musician_id" ++ show mid
     getPlaylist (MusicianName mname) = do
         mmid <- musicianId mname
         Radio.getPlaylist (MusicianId $ read $ fromJust mmid)
