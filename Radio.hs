@@ -25,10 +25,12 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Binary (sinkFile)
+import           Data.Monoid ((<>))
 import           Data.Yaml
 import           Network.HTTP.Conduit hiding (path)
 import           Network.MPD hiding (play, pause, Value)
 import qualified Network.MPD as MPD
+import           Network.Wai.Logger (ZonedDate, clockDateCacher)
 import           System.Directory (doesFileExist, getHomeDirectory)
 import           System.IO
 import           System.IO.Unsafe (unsafePerformIO)
@@ -82,21 +84,21 @@ class FromJSON a => Radio a where
                     else report param x
             Left err -> print err
 
-    play :: Logger -> Param a -> [a] -> IO ()
+    play :: LoggerSet -> Param a -> [a] -> IO ()
     play logger reqData xxs = do
         st <- withMPD status
         case st of
             Right _ -> playWithMPD logger reqData xxs
             Left  _ -> playWithMplayer logger reqData xxs
 
-playWithMPD :: Radio a => Logger -> Param a -> [a] -> IO ()
+playWithMPD :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 playWithMPD logger reqData [] = 
     getPlaylist reqData >>= playWithMPD logger reqData
 playWithMPD logger reqData (x:xs)
     | playable x = loadAndPlay logger reqData (x:xs)
     | otherwise = downloadAndPlay logger reqData (x:xs)
 
-loadAndPlay :: Radio a => Logger -> Param a -> [a] -> IO ()
+loadAndPlay :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 loadAndPlay logger reqData [] = 
     getPlaylist reqData >>= loadAndPlay logger reqData
 loadAndPlay logger reqData (x:xs) = do
@@ -123,7 +125,7 @@ loadAndPlay logger reqData (x:xs) = do
             then putMVar eof ()
             else mpdPlay
 
-downloadAndPlay :: Radio a => Logger -> Param a -> [a] -> IO ()
+downloadAndPlay :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 downloadAndPlay logger reqData [] = 
     getPlaylist reqData >>= downloadAndPlay logger reqData
 downloadAndPlay logger reqData (x:xs) = do
@@ -131,7 +133,7 @@ downloadAndPlay logger reqData (x:xs) = do
     print surl
     req <- parseUrl surl
     home <- getLordDir
-    manager <- newManager def
+    manager <- newManager conduitManagerSettings
     forkIO $ E.catch 
         (do
             logAndReport logger reqData x
@@ -179,7 +181,7 @@ downloadAndPlay logger reqData (x:xs) = do
                         takeMVar eof                     -- Finished
             else mpdPlay                                 -- Pause
 
-playWithMplayer :: Radio a => Logger -> Param a -> [a] -> IO ()
+playWithMplayer :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 playWithMplayer logger reqData [] = 
     getPlaylist reqData >>= playWithMplayer logger reqData
 playWithMplayer logger reqData (x:xs) = do
@@ -190,7 +192,7 @@ playWithMplayer logger reqData (x:xs) = do
         void $ waitForProcess =<< runCommand sh
     playWithMplayer logger reqData xs
 
-logAndReport :: Radio a => Logger -> Param a -> a -> IO ()
+logAndReport :: Radio a => LoggerSet -> Param a -> a -> IO ()
 logAndReport logger reqData x = do
     writeLog logger (show $ songMeta x) 
     getStateFile >>= flip writeFile (show $ songMeta x)
@@ -280,15 +282,12 @@ getLogFile = (++ "/lord.log") <$> getLordDir
 getStateFile :: IO FilePath
 getStateFile = (++ "/lordstate") <$> getLordDir
 
-formatLogMessage :: IO ZonedDate -> String -> IO [LogStr]
+formatLogMessage :: IO ZonedDate -> String -> IO LogStr
 formatLogMessage getdate msg = do
     now <- getdate
-    return 
-        [ LB now
-        , LB " : "
-        , LS $ encodeString msg
-        , LB "\n"
-        ]
+    return $ toLogStr now <> " : " <> toLogStr (encodeString msg) <> "\n"
 
-writeLog :: Logger -> String -> IO ()
-writeLog l msg = formatLogMessage (loggerDate l) msg >>= loggerPutStr l
+writeLog :: LoggerSet -> String -> IO ()
+writeLog l msg = do
+    (loggerDate, _) <- clockDateCacher
+    formatLogMessage loggerDate msg >>= pushLogStr l

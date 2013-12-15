@@ -2,15 +2,16 @@ import           Control.Monad (when)
 import qualified Data.ByteString.Char8 as C
 import           Data.Char (isDigit)
 import           Data.Default (def)
+import           GHC.IO.FD (openFile, stdout)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Options.Applicative
 import           Options.Applicative.Types (ParserPrefs)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
-import           System.IO ( openFile, IOMode(AppendMode)
-                           , hPutStr, stdout, stderr, SeekMode(..) )
-import           System.Log.FastLogger (mkLogger)
+import           System.IO ( IOMode(AppendMode)
+                           , hPutStr, stderr, SeekMode(..) )
+import           System.Log.FastLogger (newLoggerSet, defaultBufSize)
 import           System.Posix.Daemon
 import           System.Posix.Files (stdFileMode)
 import           System.Posix.IO ( fdWrite, createFile, setLock
@@ -245,8 +246,11 @@ listen nodaemon param = do
                                 return True
 
     pid <- getPidFile
-    logger <- if nodaemon' then mkLogger True stdout 
-              else getLogFile >>= flip openFile AppendMode >>= mkLogger True
+    logger <- if nodaemon' then newLoggerSet defaultBufSize stdout 
+              else do
+                  fp <- getLogFile
+                  (fd, _) <- openFile fp AppendMode True
+                  newLoggerSet defaultBufSize fd
     let listen' = play logger param []
     running <- isRunning pid
     when running $ killAndWait pid 
