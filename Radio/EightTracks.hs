@@ -142,8 +142,6 @@ instance Radio.Radio EightTracks where
 
     tagged _ = False
     
-    playable _ = True
-
     reportRequired _ = True
 
     -- From api-doc: In order to be legal and pay royalties properly,

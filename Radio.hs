@@ -18,17 +18,13 @@ import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
-import qualified Control.Exception as E
 import           Control.Monad (liftM, when, void)
 import           Data.Aeson hiding (encode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
-import           Data.Conduit (runResourceT, ($$+-))
-import           Data.Conduit.Binary (sinkFile)
 import           Data.Maybe (isJust, fromJust)
 import           Data.Monoid ((<>))
 import           Data.Yaml
-import           Network.HTTP.Conduit hiding (path)
 import           Network.MPD hiding (play, pause, Value)
 import qualified Network.MPD as MPD
 import           Network.MPD.Core (getResponse)
@@ -65,11 +61,6 @@ class FromJSON a => Radio a where
 
     tagged :: a -> Bool
 
-    -- Mpd can play remote mp3 files directly.
-    -- For m4a files, lord download it as ~/.lord/lord.m4a
-    playable :: a -> Bool
-    playable _ = True
-
     reportRequired :: a -> Bool
     reportRequired _ = False
 
@@ -93,25 +84,18 @@ class FromJSON a => Radio a where
             Right _ -> playWithMPD logger reqData xxs
             Left  _ -> playWithMplayer logger reqData xxs
 
+-- MPD can play remote m4a files directly since version-0.18
 playWithMPD :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 playWithMPD logger reqData [] =
     getPlaylist reqData >>= playWithMPD logger reqData
-playWithMPD logger reqData (x:xs)
-    | playable x = loadAndPlay logger reqData (x:xs)
-    | otherwise = downloadAndPlay logger reqData (x:xs)
-
--- Can loadAndPlay remote m4a files since mpd-0.18
-loadAndPlay :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
-loadAndPlay logger reqData [] =
-    getPlaylist reqData >>= loadAndPlay logger reqData
-loadAndPlay logger reqData (x:xs) = do
+playWithMPD logger reqData (x:xs) = do
     surl <- songUrl reqData x
     print surl
     when (surl /= "") $ do
         logAndReport logger reqData x
         mpdLoad $ Path $ C.pack surl
         takeMVar eof                     -- Finished
-    loadAndPlay logger reqData xs
+    playWithMPD logger reqData xs
   where
     mpdLoad :: Path -> IO ()
     mpdLoad path = do
@@ -128,63 +112,6 @@ loadAndPlay logger reqData (x:xs) = do
         if st == Right Stopped
             then putMVar eof ()
             else mpdPlay
-
-
-downloadAndPlay :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
-downloadAndPlay logger reqData [] =
-    getPlaylist reqData >>= downloadAndPlay logger reqData
-downloadAndPlay logger reqData (x:xs) = do
-    surl <- songUrl reqData x
-    print surl
-    req <- parseUrl surl
-    home <- getLordDir
-    manager <- newManager conduitManagerSettings
-    forkIO $ E.catch
-        (do
-            logAndReport logger reqData x
-
-            runResourceT $ do
-                res <- http req manager
-                responseBody res $$+- sinkFile (home ++ "/lord.m4a")
-            -- This will block until eof.
-
-            putMVar eof ())
-        (\e -> do
-            print (e :: E.SomeException)
-            writeLog logger $ show e
-            downloadAndPlay logger reqData xs
-            )
-    threadDelay (3*1000000)
-    mpdLoad m4a
-    downloadAndPlay logger reqData xs
-  where
-    m4a = "lord/lord.m4a"
-
-    mpdLoad :: Path -> IO ()
-    mpdLoad path = do
-        s <- withMPD $ do
-                clear
-                update [Path "lord"]
-                add path
-        case s of
-            Right _ -> do
-                withMPD $ MPD.play Nothing
-                mpdPlay
-            _                  -> mpdLoad path
-
-    mpdPlay :: IO ()
-    mpdPlay = do
-        st <- mpdState
-        bd <- isEmptyMVar eof
-        if st == Right Stopped
-            then if bd
-                    then do                              -- Slow Network
-                        withMPD $ MPD.play Nothing
-                        mpdPlay
-                    else do
-                        withMPD clear
-                        takeMVar eof                     -- Finished
-            else mpdPlay                                 -- Pause
 
 playWithMplayer :: Radio a => LoggerSet -> Param a -> [a] -> IO ()
 playWithMplayer logger reqData [] =

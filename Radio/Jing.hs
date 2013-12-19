@@ -122,8 +122,6 @@ instance Radio.Radio Jing where
 
     -- Songs from jing.fm comes with tags!
     tagged _ = True
-    
-    playable _ = True
 
 instance FromJSON JingParam
 instance ToJSON JingParam
