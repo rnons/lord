@@ -142,7 +142,7 @@ instance Radio.Radio EightTracks where
 
     tagged _ = False
     
-    playable _ = False
+    playable _ = True
 
     reportRequired _ = True
 
