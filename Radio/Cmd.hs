@@ -26,7 +26,7 @@ data Cmd = Cmd
     , artwork_url :: String
     , description   :: String
     , duration      :: Int
-    , genre         :: String
+    --, genre         :: String
     , tag_list      :: String
     , waveform_url  :: String
     , stream_url    :: String
@@ -63,18 +63,18 @@ instance Radio.Radio Cmd where
         let req = initReq { method = "GET"
                           , queryString = renderQuery False query
                           }
-        E.catch (withManager $ \manager -> 
+        E.catch (withManager $ \manager ->
                     httpLbs req { redirectCount = 0 } manager >> return "")
                 (\e -> case e of
                     (StatusCodeException s hdr _) ->
-                        if s == status302 then redirect hdr 
+                        if s == status302 then redirect hdr
                         else return ""
                     otherException -> print otherException >> return ""
                 )
       where
         url = stream_url x
         query = [("client_id", Just $ C.pack "2b659ea66970555922d89ce9c07b2d0d")]
-        redirect hdr = case HM.lookup hLocation $ HM.fromList hdr of 
+        redirect hdr = case HM.lookup hLocation $ HM.fromList hdr of
                             Just u   -> return $ C.unpack u
                             Nothing  -> return ""
 
@@ -84,7 +84,7 @@ instance Radio.Radio Cmd where
 
 -- Currently, no api is provided to retrieve genre list.
 genres :: IO [String]
-genres = return 
+genres = return
     ["80s","Abstract","Acid Jazz","Acoustic"
     ,"Acoustic Rock","Alternative","Ambient","Avantgarde"
     ,"Ballads","Blues","Blues Rock","Breakbeats"
