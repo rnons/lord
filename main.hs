@@ -1,8 +1,9 @@
-import           Control.Monad (when)
+import           Control.Monad (void, when)
 import qualified Data.ByteString.Char8 as C
 import           Data.Default (def)
 import           GHC.IO.FD (openFile, stdout)
 import           Network.MPD (withMPD, clear, status, stState)
+import           Network.MPD.Commands.Extensions (toggle)
 import           Options.Applicative
 import           Options.Applicative.Types (ParserPrefs)
 import           System.Directory (createDirectoryIfMissing)
@@ -21,7 +22,7 @@ import Radio
 import qualified Radio.Cmd as Cmd
 import Radio.Douban
 import qualified Radio.EightTracks as ET
-import Radio.Jing 
+import Radio.Jing
 import qualified Radio.Reddit as Reddit
 
 data Options = Options
@@ -35,6 +36,7 @@ data Command = CmdFM CmdSubCommand
              | JingFM JingSubCommand
              | RedditFM RedditSubCommand
              | Status
+             | Toggle
              | Kill
     deriving (Eq, Show)
 
@@ -65,7 +67,7 @@ data RedditSubCommand = RedditListen String
 type Keywords = String
 
 optParser :: Parser Options
-optParser = Options 
+optParser = Options
     <$> subparser ( command "cmd"           (info (helper <*> cmdOptions)
                         (progDesc "cmd.fm commander"))
                  <> command "douban"        (info (helper <*> doubanOptions)
@@ -77,18 +79,20 @@ optParser = Options
                  <> command "reddit"        (info (helper <*> redditOptions)
                         (progDesc "radioreddit.com commander"))
                  <> command "status"        (info (pure Status)
-                        (progDesc "show current status"))
+                        (progDesc "Show current status"))
+                 <> command "toggle"        (info (pure Toggle)
+                        (progDesc "Toggles play/pause. Plays if stopped"))
                  <> command "kill"          (info (pure Kill)
-                        (progDesc "kill the current running lord session"))
+                        (progDesc "Kill the current running lord session"))
                   )
-    <*> switch (long "no-daemon" <> help "don't detach from console")
+    <*> switch (long "no-daemon" <> help "Don't detach from console")
 
 main :: IO ()
 main = do
     -- Make sure ~/.lord exists
     getLordDir >>= createDirectoryIfMissing False
 
-    o <- execParser' $ info (helper <*> optParser) 
+    o <- execParser' $ info (helper <*> optParser)
                            (fullDesc <> header "Lord: radio commander")
     let nodaemon = optDaemon o
     case optCommand o of
@@ -96,7 +100,7 @@ main = do
             case subCommand of
                 CmdListen genre   -> listen nodaemon (Cmd.Genre genre)
                 CmdGenreList      -> Cmd.genres >>= Cmd.pprGenres
-        DoubanFM subCommand -> 
+        DoubanFM subCommand ->
             case subCommand of
                  DoubanListen key -> listen nodaemon (douban key)
                  DoubanHot        -> doubanHot
@@ -115,6 +119,7 @@ main = do
                 RedditListen genre   -> listen nodaemon (Reddit.Genre genre)
                 RedditGenreList      -> Reddit.genres >>= Reddit.pprGenres
         Status -> lordStatus
+        Toggle -> void $ withMPD toggle
         Kill -> killLord
 
 -- Taken from Options.Applicative.Extra
@@ -125,11 +130,11 @@ execParser' = customExecParser' (prefs idm)
 customExecParser' :: ParserPrefs -> ParserInfo a -> IO a
 customExecParser' pprefs pinfo = do
     args <- getArgs
-    
+
     -- My modification!
     -- Run lord with no args is equivalent to run lord status.
     when (null args) $ lordStatus >> exitSuccess
-  
+
     case execParserPure pprefs pinfo args of
         Right a -> return a
         Left failure -> do
@@ -143,53 +148,53 @@ customExecParser' pprefs pinfo = do
 
 cmdOptions :: Parser Command
 cmdOptions = CmdFM <$> subparser
-    ( command "listen" 
+    ( command "listen"
         (info (helper <*> (CmdListen <$> argument str (metavar "GENRE")))
               (progDesc "Provide genre to listen to cmd.fm"))
-    <> command "genres" 
+    <> command "genres"
         (info (pure CmdGenreList) (progDesc "List available genres"))
     )
 
 doubanOptions :: Parser Command
-doubanOptions = DoubanFM <$> subparser 
-    ( command "listen" 
+doubanOptions = DoubanFM <$> subparser
+    ( command "listen"
         (info (helper <*> (DoubanListen <$> argument str (
                   metavar "[<channel_id> | <album_url> | <muscian_url> | <musician_name>]")))
-              (progDesc "Provide cid/musician to listen to douban.fm"))
-    <> command "search" 
+              (progDesc "Provide channel_id/album_url/musician_url/musician_name to listen to douban.fm"))
+    <> command "search"
         (info (helper <*> (DoubanSearch <$> argument str (metavar "KEYWORDS")))
-              (progDesc "search channels"))
-    <> command "hot" (info (pure DoubanHot) (progDesc "hot channels"))
-    <> command "trending" 
-        (info (pure DoubanTrending) (progDesc "trending up channels"))
+              (progDesc "Search channels"))
+    <> command "hot" (info (pure DoubanHot) (progDesc "Hot channels"))
+    <> command "trending"
+        (info (pure DoubanTrending) (progDesc "Trending up channels"))
     )
 
 etOptions :: Parser Command
 etOptions = EightTracks <$> subparser
     ( command "listen"
-        (info (helper <*> (ETListen <$> argument str (metavar "mix id")))
-              (progDesc "Provide mix id to listen to 8tracks.com"))
+        (info (helper <*> (ETListen <$> argument str (metavar "[<mix_id> | <mix_url>]")))
+              (progDesc "Provide mix_id/mix_url to listen to 8tracks.com"))
     <> command "featured" (info (pure ETFeatured) (progDesc "Featured mixes"))
     <> command "trending" (info (pure ETFeatured) (progDesc "Trending mixes"))
     <> command "newest" (info (pure ETFeatured) (progDesc "Newest mixes"))
     <> command "search"
         (info (helper <*> (ETSearch <$> argument str (metavar "KEYWORDS")))
-              (progDesc "search mixes"))
+              (progDesc "Search mixes"))
     )
 
 jingOptions :: Parser Command
-jingOptions = JingFM <$> subparser 
-    ( command "listen" 
+jingOptions = JingFM <$> subparser
+    ( command "listen"
         (info (helper <*> (JingListen <$> argument str (metavar "KEYWORDS")))
               (progDesc "Provide keywords to listen to jing.fm"))
     )
 
 redditOptions :: Parser Command
 redditOptions = RedditFM <$> subparser
-    ( command "listen" 
+    ( command "listen"
         (info (helper <*> (RedditListen <$> argument str (metavar "GENRE")))
               (progDesc "Provide genre to listen to radioreddit.com"))
-    <> command "genres" 
+    <> command "genres"
         (info (pure RedditGenreList) (progDesc "List available genres"))
     )
 
@@ -210,7 +215,7 @@ etListen nodaemon k = do
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ ET.userName tok'
             listen nodaemon tok'
-        _         -> do 
+        _         -> do
             param <- login k :: IO (Radio.Param ET.EightTracks)
             listen nodaemon param
 
@@ -224,7 +229,7 @@ jingListen nodaemon k = do
         Just tok' -> do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
             listen nodaemon tok'
-        _         -> do 
+        _         -> do
             param <- login k :: IO (Radio.Param Jing)
             listen nodaemon param
 
@@ -232,21 +237,21 @@ listen :: Radio a => Bool -> Radio.Param a -> IO ()
 listen nodaemon param = do
     -- mplayer backend won't work in daemon mode!
     st <- withMPD status
-    nodaemon' <- case st of 
+    nodaemon' <- case st of
                      Right _ -> return nodaemon
-                     Left  e -> print e >> 
+                     Left  e -> print e >>
                                 putStrLn "Lord will run in foreground" >>
                                 return True
 
     pid <- getPidFile
-    logger <- if nodaemon' then newLoggerSet defaultBufSize stdout 
+    logger <- if nodaemon' then newLoggerSet defaultBufSize stdout
               else do
                   fp <- getLogFile
                   (fd, _) <- openFile fp AppendMode True
                   newLoggerSet defaultBufSize fd
     let listen' = play logger param []
     running <- isRunning pid
-    when running $ killAndWait pid 
+    when running $ killAndWait pid
     if nodaemon' then runInForeground pid listen'
                  else runDetached (Just pid) def listen'
 
@@ -265,13 +270,13 @@ killLord = withMPD clear >> getPidFile >>= kill
 lordStatus :: IO ()
 lordStatus = do
     running <- getPidFile >>= isRunning
-    myStatus <- 
+    myStatus <-
         if running then do
             st <- fmap stState <$> withMPD status
             let state = case st of
                     Right s  -> show s
                     Left err -> error $ show err
-            song <- getStateFile >>= readFile 
+            song <- getStateFile >>= readFile
             return $ "[" ++ state ++ "] " ++ song
         else return "Not running!"
     putStrLn myStatus
