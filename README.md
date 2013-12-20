@@ -4,7 +4,7 @@ Lord is a unified command line interface to several online radios.
 
 By default, lord uses [mpd] as backend.
 When mpd is available, lord can be run as daemon (default) or in foreground (with `--no-daemon` option).
-When mpd is unavailable (not running), it will fallback to use [mplayer]. Mplayer is run in to enable user control playback with mplayer keybindings.
+When mpd is unavailable (not running), lord will fallback to use [mplayer]. Mplayer is run in foreground to allow user controlling playback with mplayer keybindings.
 
 Supported radios:
 
@@ -14,11 +14,16 @@ Supported radios:
 - [douban.fm]  Only in China?
 - [jing.fm] Only in China?
 
+Lord is on [hackage](http://hackage.haskell.org/package/lord), you can install with
+
+    cabal install lord
+
 ## Commands
 
 ```
 lord -h
 lord status
+lord toggle
 lord kill
 
 lord 8tracks listen [<mix_id> | <mix_url>] [--no-daemon]
@@ -28,7 +33,7 @@ lord 8tracks [featured | trending | newest]
 lord cmd listen <genre> [--no-daemon]
 lord cmd genres
 
-lord douban listen [<channel_id> | <musician>] [--no-daemon]
+lord douban listen [<channel_id> | <album_url> | <musician_url> | <musician_name>] [--no-daemon]
 lord douban search <keywords>
 lord douban [hot | trending]
 
