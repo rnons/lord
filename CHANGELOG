@@ -1,5 +1,11 @@
 CHANGELOG
 
+2.20131203 -> 2.20131220
+  - Update to fast-logger-2.0
+  - New command: lord douban listen [<album_url> | <musician_url>]
+  - New command: lord toggle
+  - Adjust for new cmd.fm api
+
 2.20131201 -> 2.20131203
   - Bug fixes
 

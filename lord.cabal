@@ -1,7 +1,7 @@
 name:                lord
-version:             2.20131203
+version:             2.20131220
 synopsis:            A command line interface to online radios.
-description:         
+description:
     A unified command line interface to several online radios, use mpd (<http://musicpd.org>) as backend by default. Will fallback to mplayer (<http://www.mplayerhq.hu>) when mpd is unavailable.
     .
     Supported radios:
@@ -29,7 +29,7 @@ description:
     > lord cmd listen <genre> [--no-daemon]
     > lord cmd genres
     >
-    > lord douban listen [<channel_id> | <musician>] [--no-daemon]
+    > lord douban listen [<channel_id> | <album_url> | <musician_url> | <musician_name>] [--no-daemon]
     > lord douban search <keywords>
     > lord douban [hot | trending]
     >
@@ -37,7 +37,7 @@ description:
     >
     > lord reddit listen <genre> [--no-daemon]
     > lord reddit genres
-    
+
 homepage:            https://github.com/rnons/lord
 bug-reports:         https://github.com/rnons/lord/issues
 license:             PublicDomain
@@ -55,7 +55,7 @@ source-repository   head
   location:         git://github.com/rnons/lord.git
 
 executable lord
-  main-is:              main.hs         
+  main-is:              main.hs
   other-modules:        Radio,
                         Radio.Cmd,
                         Radio.Douban,
@@ -65,29 +65,29 @@ executable lord
                         Radio.Jing,
                         Radio.Reddit
   ghc-options:          -Wall -fno-warn-unused-do-bind
-  build-depends:        base >= 4 && < 5, 
-                        aeson >= 0.6, 
-                        ansi-terminal >= 0.6, 
-                        attoparsec-conduit >= 1.0, 
-                        bytestring >= 0.9, 
-                        case-insensitive >= 1.0, 
-                        conduit >= 1.0, 
+  build-depends:        base >= 4 && < 5,
+                        aeson >= 0.6,
+                        ansi-terminal >= 0.6,
+                        attoparsec-conduit >= 1.0,
+                        bytestring >= 0.9,
+                        case-insensitive >= 1.0,
+                        conduit >= 1.0,
                         daemons >= 0.1.2,
                         data-default >= 0.5,
-                        directory >= 1.1, 
+                        directory >= 1.1,
                         fast-logger >= 2.0,
-                        html-conduit >= 1.1, 
-                        http-conduit >= 1.9, 
-                        http-types >= 0.8, 
-                        libmpd >= 0.8, 
+                        html-conduit >= 1.1,
+                        http-conduit >= 1.9,
+                        http-types >= 0.8,
+                        libmpd >= 0.8,
                         optparse-applicative >= 0.5,
                         process >= 1.1,
-                        text >= 0.11, 
-                        transformers >= 0.3, 
-                        unix >= 2.5, 
-                        unordered-containers >= 0.2, 
+                        text >= 0.11,
+                        transformers >= 0.3,
+                        unix >= 2.5,
+                        unordered-containers >= 0.2,
                         wai-logger >= 2.0,
-                        utf8-string >= 0.3, 
+                        utf8-string >= 0.3,
                         xml-conduit >= 1.1,
                         yaml >= 0.8
   default-language:     Haskell2010
@@ -98,29 +98,29 @@ test-suite test
   ghc-options:          -Wall -fno-warn-unused-do-bind
   hs-source-dirs:       .
   build-depends:        base >= 4 && < 5,
-                        aeson >= 0.6, 
-                        ansi-terminal >= 0.6, 
-                        attoparsec-conduit >= 1.0, 
-                        bytestring >= 0.9, 
-                        case-insensitive >= 1.0, 
-                        conduit >= 1.0, 
+                        aeson >= 0.6,
+                        ansi-terminal >= 0.6,
+                        attoparsec-conduit >= 1.0,
+                        bytestring >= 0.9,
+                        case-insensitive >= 1.0,
+                        conduit >= 1.0,
                         daemons >= 0.1.2,
                         data-default >= 0.5,
-                        directory >= 1.1, 
+                        directory >= 1.1,
                         fast-logger >= 2.0,
                         hspec >= 1.6,
-                        html-conduit >= 1.1, 
-                        http-conduit >= 1.9, 
-                        http-types >= 0.8, 
+                        html-conduit >= 1.1,
+                        http-conduit >= 1.9,
+                        http-types >= 0.8,
                         HUnit >= 1.2,
-                        libmpd >= 0.8, 
+                        libmpd >= 0.8,
                         optparse-applicative >= 0.5,
                         process >= 1.1,
-                        text >= 0.11, 
-                        transformers >= 0.3, 
-                        unix >= 2.5, 
-                        unordered-containers >= 0.2, 
-                        utf8-string >= 0.3, 
+                        text >= 0.11,
+                        transformers >= 0.3,
+                        unix >= 2.5,
+                        unordered-containers >= 0.2,
+                        utf8-string >= 0.3,
                         wai-logger >= 2.0,
                         xml-conduit >= 1.1,
                         yaml >= 0.8
