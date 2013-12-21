@@ -25,7 +25,7 @@ import           Text.XML.Cursor
 import qualified Radio
 
 
-data Douban = Douban 
+data Douban = Douban
     { picture :: String
     , albumtitle :: String
     -- , company :: String
@@ -72,11 +72,11 @@ getPlaylist' query = do
 
 musicianId :: String -> IO (Maybe String)
 musicianId mname = do
-    let rurl = "http://music.douban.com/subject_search/?search_text=" ++ 
+    let rurl = "http://music.douban.com/subject_search/?search_text=" ++
               C.unpack (urlEncode True (C.pack $ encodeString mname))
     rsp <- simpleHttp rurl
     let cursor = fromDocument $ parseLBS rsp
-        href = cursor $// element "a" 
+        href = cursor $// element "a"
                       >=> attributeIs "class" "ll musician_title "
                       &|  attribute "href"
     return $ Just $ filter isDigit $ T.unpack $ head $ head href
@@ -92,7 +92,7 @@ albumPlayable aId = do
     aPattern = "http://music.douban.com/subject/"
 
 mkQuery :: Int -> String -> Query
-mkQuery cid context = 
+mkQuery cid context =
     [ ("type", Just "n")
     , ("channel", Just $ C.pack $ show cid)
     , ("context", Just $ C.pack context)
@@ -100,9 +100,9 @@ mkQuery cid context =
     ]
 
 instance Radio.Radio Douban  where
-    data Param Douban = ChannelId Int 
+    data Param Douban = ChannelId Int
                       | Album Int
-                      | MusicianId Int 
+                      | MusicianId Int
                       | MusicianName String
 
     -- TODO: those without ssid filed are ads, filter them out!
@@ -116,10 +116,10 @@ instance Radio.Radio Douban  where
     getPlaylist (ChannelId cid) = getPlaylist' $ mkQuery cid ""
     getPlaylist (Album aId) = do
         playable <- albumPlayable aId
-        if playable then getPlaylist' $ 
-                         mkQuery 0 $ "channel:0|subjetc_id:" ++ show aId
+        if playable then getPlaylist' $
+                         mkQuery 0 $ "channel:0|subject_id:" ++ show aId
                     else error "This album can not be played."
-    getPlaylist (MusicianId mid) = 
+    getPlaylist (MusicianId mid) =
         getPlaylist' $ mkQuery 0 $ "channel:0|musician_id" ++ show mid
     getPlaylist (MusicianName mname) = do
         mmid <- musicianId mname
@@ -131,8 +131,8 @@ instance Radio.Radio Douban  where
 
     -- Songs from douban.fm comes with no tags!
     tagged _ = False
-    
-data Channel = Channel 
+
+data Channel = Channel
     { intro :: String
     , name :: String
     , song_num :: Int
@@ -159,14 +159,14 @@ pprChannels :: [Channel] -> IO ()
 pprChannels chs =
     forM_ chs (\c -> do
         setSGR [SetConsoleIntensity BoldIntensity]
-        putStr $ "* " ++ name c 
+        putStr $ "* " ++ name c
         setSGR [SetColor Foreground Vivid Green]
         putStrLn $ " cid=" ++ show (id c)
         setSGR [Reset]
-        let folding = foldr (\x acc -> 
+        let folding = foldr (\x acc ->
                       if x `elem` "\r\n" then ' ':acc else x:acc) []
-        putStrLn $ "    Intro: " ++ folding (intro c) 
-        putStr "    Hot songs: " 
+        putStrLn $ "    Intro: " ++ folding (intro c)
+        putStr "    Hot songs: "
         forM_ (hot_songs c) (\s -> putStr $ s ++ ", ")
         putStrLn ""
         )
@@ -189,8 +189,8 @@ trending = search' rurl
 search :: String -> IO [Channel]
 search [] = return []
 search key = search' rurl
-  where 
-    rurl = "http://douban.fm/j/explore/search?query=" ++ 
+  where
+    rurl = "http://douban.fm/j/explore/search?query=" ++
           -- encodeString: encode chinese characters
           C.unpack (urlEncode True (C.pack $ encodeString key))
 
