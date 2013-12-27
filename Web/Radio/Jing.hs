@@ -5,7 +5,7 @@
 -- | Module of http://jing.fm
 -- It's a bit tricky to play jing.fm
 -- Notice the `play` function of **instance Radio**
-module Radio.Jing where
+module Web.Radio.Jing where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
@@ -24,9 +24,9 @@ import           GHC.Generics (Generic)
 import           Network.HTTP.Types 
 import           Network.HTTP.Conduit
 
-import Radio
+import Web.Radio
 
-type JingParam = Radio.Param Jing
+type JingParam = Param Jing
 
 data Jing = Jing 
     { abid :: Int       -- album id
@@ -55,7 +55,7 @@ instance FromJSON Usr where
                            v .: "nick"
     parseJSON _          = mzero
 
-instance Radio.Radio Jing where
+instance Radio Jing where
     data Param Jing = Token
         { aToken        :: ByteString
         , rToken        :: ByteString
@@ -94,7 +94,7 @@ instance Radio.Radio Jing where
         let req' = urlEncodedBody query req
         withManager $ \manager -> do
             res <- http req' manager
-            liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
+            liftM parsePlaylist (responseBody res $$+- sinkParser json)
 
     songUrl tok x = E.catch 
         (do
@@ -116,9 +116,9 @@ instance Radio.Radio Jing where
                 responseBody res $$+- sinkParser json
             let (String surl) = fromJust $ HM.lookup "result" hm
             return $ T.unpack surl)
-        (\e -> print (e :: E.SomeException) >> Radio.songUrl tok x)
+        (\e -> print (e :: E.SomeException) >> songUrl tok x)
 
-    songMeta x = Radio.SongMeta (atn x) (an x) (n x)
+    songMeta x = SongMeta (atn x) (an x) (n x)
 
     -- Songs from jing.fm comes with tags!
     tagged _ = True
@@ -157,5 +157,5 @@ instance NeedLogin Jing where
 
     mkParam param key = param { cmbt = key }
 
-instance FromJSON (Radio.Config Jing)
-instance ToJSON (Radio.Config Jing)
+instance FromJSON (Config Jing)
+instance ToJSON (Config Jing)

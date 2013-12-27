@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -- | Module of http://radioreddit.com
-module Radio.Reddit where
+module Web.Radio.Reddit where
 
 import           Control.Monad (liftM)
 import           Data.Aeson
@@ -13,7 +13,7 @@ import           Data.Maybe (fromMaybe)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Conduit
 
-import qualified Radio
+import qualified Web.Radio as Radio
 
 data Reddit = Reddit
     { title         :: String

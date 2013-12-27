@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Radio.EightTracks.User where
+module Web.Radio.EightTracks.User where
 import           Data.Aeson   (FromJSON)
 import           GHC.Generics (Generic)
 

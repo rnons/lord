@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -- | Module of http://cmd.fm
-module Radio.Cmd where
+module Web.Radio.Cmd where
 
 import qualified Control.Exception as E
 import           Control.Monad (liftM)
@@ -17,7 +17,7 @@ import           Network.HTTP.Types (renderQuery)
 import           Network.HTTP.Types.Header (hLocation)
 import           Network.HTTP.Types.Status (status302)
 
-import qualified Radio
+import qualified Web.Radio as Radio
 
 
 data Cmd = Cmd

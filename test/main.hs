@@ -3,12 +3,12 @@ import Data.Maybe (fromJust)
 import Test.Hspec
 import Test.HUnit
 
-import Radio
-import qualified Radio.Cmd as Cmd
-import Radio.EightTracks
-import Radio.Douban
-import Radio.Jing
-import qualified Radio.Reddit as Reddit
+import Web.Radio
+import qualified Web.Radio.Cmd as Cmd
+import Web.Radio.EightTracks
+import Web.Radio.Douban
+import Web.Radio.Jing
+import qualified Web.Radio.Reddit as Reddit
 
 
 main :: IO ()

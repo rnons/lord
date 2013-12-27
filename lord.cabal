@@ -56,14 +56,14 @@ source-repository   head
 
 executable lord
   main-is:              main.hs
-  other-modules:        Radio,
-                        Radio.Cmd,
-                        Radio.Douban,
-                        Radio.EightTracks,
-                        Radio.EightTracks.Explore,
-                        Radio.EightTracks.User,
-                        Radio.Jing,
-                        Radio.Reddit
+  other-modules:        Web.Radio,
+                        Web.Radio.Cmd,
+                        Web.Radio.Douban,
+                        Web.Radio.EightTracks,
+                        Web.Radio.EightTracks.Explore,
+                        Web.Radio.EightTracks.User,
+                        Web.Radio.Jing,
+                        Web.Radio.Reddit
   ghc-options:          -Wall -fno-warn-unused-do-bind
   build-depends:        base >= 4 && < 5,
                         aeson >= 0.6,

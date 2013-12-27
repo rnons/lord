@@ -5,7 +5,7 @@
 
 -- | Module of http://8tracks.com
 -- API documentation: http://8tracks.com/developers/api_v3
-module Radio.EightTracks where
+module Web.Radio.EightTracks where
 
 import qualified Control.Exception as E
 import           Control.Monad (forM_, liftM)
@@ -26,9 +26,9 @@ import           Prelude hiding (id)
 import           System.Console.ANSI
 import           System.IO.Unsafe (unsafePerformIO)
 
-import Radio
-import qualified Radio.EightTracks.Explore as Exp
-import qualified Radio.EightTracks.User as U
+import Web.Radio
+import qualified Web.Radio.EightTracks.Explore as Exp
+import qualified Web.Radio.EightTracks.User as U
 
 
 running :: MVar ()
@@ -41,7 +41,7 @@ verHdr, keyHdr :: Header
 verHdr = (mk "X-Api-Version", "3")
 keyHdr = (mk "X-Api-Key", C.pack apiKey)
 
-type ETParam = Radio.Param EightTracks
+type ETParam = Param EightTracks
 
 -- | Response from http://8tracks.com/sets/new.json
 -- `play_token` is the value of interest
@@ -92,7 +92,7 @@ data MixInfo = MixInfo
 instance FromJSON MixInfo where
     parseJSON = genericParseJSON defaultOptions { fieldLabelModifier = drop 5 }
 
-instance Radio.Radio EightTracks where
+instance Radio EightTracks where
     data Param EightTracks = Token
         { userToken     :: String
         , userName      :: String
@@ -133,11 +133,11 @@ instance Radio.Radio EightTracks where
                               , queryString = renderSimpleQuery False query }
             withManager $ \manager -> do
                 res <- http req manager
-                liftM Radio.parsePlaylist (responseBody res $$+- sinkParser json)
+                liftM parsePlaylist (responseBody res $$+- sinkParser json)
 
     songUrl _ x = return $ track_file_stream_url x
 
-    songMeta x = Radio.SongMeta (performer x) 
+    songMeta x = SongMeta (performer x) 
                                 (fromMaybe "" $ release_name x) (name x)
 
     tagged _ = False
@@ -185,8 +185,8 @@ instance NeedLogin EightTracks where
 
     mkParam param key = param { mixId = read key }
 
-instance FromJSON (Radio.Config EightTracks)
-instance ToJSON (Radio.Config EightTracks)
+instance FromJSON (Config EightTracks)
+instance ToJSON (Config EightTracks)
 
 newPlayToken :: IO Int
 newPlayToken = do

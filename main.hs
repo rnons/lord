@@ -18,12 +18,12 @@ import           System.Posix.IO ( fdWrite, createFile, setLock
                                  , LockRequest(..) )
 import           System.Posix.Process (getProcessID)
 
-import Radio
-import qualified Radio.Cmd as Cmd
-import Radio.Douban
-import qualified Radio.EightTracks as ET
-import Radio.Jing
-import qualified Radio.Reddit as Reddit
+import Web.Radio
+import qualified Web.Radio.Cmd as Cmd
+import Web.Radio.Douban
+import qualified Web.Radio.EightTracks as ET
+import Web.Radio.Jing
+import qualified Web.Radio.Reddit as Reddit
 
 data Options = Options
     { optCommand    :: Command
@@ -216,7 +216,7 @@ etListen nodaemon k = do
             putStrLn $ "Welcome back, " ++ ET.userName tok'
             listen nodaemon tok'
         _         -> do
-            param <- login k :: IO (Radio.Param ET.EightTracks)
+            param <- login k :: IO (Param ET.EightTracks)
             listen nodaemon param
 
 etSearch :: String -> IO ()
@@ -230,10 +230,10 @@ jingListen nodaemon k = do
             putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
             listen nodaemon tok'
         _         -> do
-            param <- login k :: IO (Radio.Param Jing)
+            param <- login k :: IO (Param Jing)
             listen nodaemon param
 
-listen :: Radio a => Bool -> Radio.Param a -> IO ()
+listen :: Radio a => Bool -> Param a -> IO ()
 listen nodaemon param = do
     -- mplayer backend won't work in daemon mode!
     st <- withMPD status

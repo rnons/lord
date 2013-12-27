@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -- | Module of http://douban.fm
-module Radio.Douban where
+module Web.Radio.Douban where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
@@ -22,7 +22,7 @@ import           System.Console.ANSI
 import           Text.HTML.DOM (parseLBS)
 import           Text.XML.Cursor
 
-import qualified Radio
+import qualified Web.Radio as Radio
 
 
 data Douban = Douban

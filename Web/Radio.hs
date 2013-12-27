@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | A generic interface to online radio services
-module Radio
+module Web.Radio
   ( SongMeta(..)
   , Radio(..)
   , NeedLogin(..)
@@ -201,7 +201,7 @@ class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
     readToken :: FromJSON (Config a)
               => (Config a -> Param a) -> String -> IO (Maybe (Param a))
     readToken selector keywords = do
-        home <- Radio.getLordDir
+        home <- getLordDir
         let yml = home ++ "/lord.yml"
         exist <- doesFileExist yml
         if exist
