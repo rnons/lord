@@ -2,10 +2,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
--- | Module of http://jing.fm
--- It's a bit tricky to play jing.fm
--- Notice the `play` function of **instance Radio**
-module Web.Radio.Jing where
+-- | Module for interfacing <http://jing.fm>
+module Web.Radio.Jing 
+  ( Jing (..)
+  , JingParam
+  , jing
+  , nick
+  ) where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))

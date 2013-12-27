@@ -82,10 +82,10 @@ library
                         Web.Radio.Cmd,
                         Web.Radio.Douban,
                         Web.Radio.EightTracks,
+                        Web.Radio.EightTracks.Explore,
                         Web.Radio.Jing,
                         Web.Radio.Reddit
-  other-modules:        Web.Radio.EightTracks.Explore,
-                        Web.Radio.EightTracks.User
+  other-modules:        Web.Radio.EightTracks.User
   ghc-options:          -Wall -fno-warn-unused-do-bind
   default-language:     Haskell2010
 

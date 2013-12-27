@@ -3,9 +3,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- | Module of http://8tracks.com
--- API documentation: http://8tracks.com/developers/api_v3
-module Web.Radio.EightTracks where
+-- | Module for interfacing <http://8tracks.com>
+--
+-- API documentation: <http://8tracks.com/developers/api_v3>
+module Web.Radio.EightTracks
+  ( EightTracks (..)
+  , PlaySession (..)
+  , PlayResponse (..)
+  , MixSet (..)
+  , MixInfo (..)
+  , getMixId
+  , featured
+  , newest
+  , trending
+  , search
+  , pprMixes
+  , ETParam
+  , eight
+  , userName
+  ) where
 
 import qualified Control.Exception as E
 import           Control.Monad (forM_, liftM)
@@ -20,7 +36,7 @@ import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser, ParseError)
 import qualified Data.List as L
 import           GHC.Generics (Generic)
-import           Network.HTTP.Types 
+import           Network.HTTP.Types
 import           Network.HTTP.Conduit
 import           Prelude hiding (id)
 import           System.Console.ANSI
@@ -72,7 +88,7 @@ data MixSet = MixSet
     } deriving (Show, Generic)
 instance FromJSON MixSet
 
-data EightTracks = EightTracks 
+data EightTracks = EightTracks
     { id                    :: Int
     , track_file_stream_url :: String
     , name                  :: String
@@ -119,7 +135,7 @@ instance Radio EightTracks where
             getPlaylist' rurl)
         (\e -> do
             -- When reached the last track in this mix. Play it again
-            print (e :: E.SomeException) 
+            print (e :: E.SomeException)
             let rurl = "http://8tracks.com/sets/" ++ show (playToken tok) ++ "/play.json"
             getPlaylist' rurl)
       where
@@ -129,7 +145,7 @@ instance Radio EightTracks where
             let query = [ ("mix_id", C.pack $ show $ mixId tok) ]
 
             initReq <- parseUrl rurl
-            let req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr] 
+            let req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr]
                               , queryString = renderSimpleQuery False query }
             withManager $ \manager -> do
                 res <- http req manager
@@ -137,11 +153,11 @@ instance Radio EightTracks where
 
     songUrl _ x = return $ track_file_stream_url x
 
-    songMeta x = SongMeta (performer x) 
+    songMeta x = SongMeta (performer x)
                                 (fromMaybe "" $ release_name x) (name x)
 
     tagged _ = False
-    
+
     reportRequired _ = True
 
     -- From api-doc: In order to be legal and pay royalties properly,
@@ -149,7 +165,7 @@ instance Radio EightTracks where
     report tok x = do
         initReq <- parseUrl rurl
         let usrHdr = (mk "X-User-Token", C.pack $ userToken tok)
-            req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr] 
+            req = initReq { requestHeaders = [verHdr, keyHdr, usrHdr]
                           , queryString = renderSimpleQuery False query }
         res <- withManager $ \manager -> httpLbs req manager
         print $ responseBody res
@@ -194,10 +210,10 @@ newPlayToken = do
     let ses = fromJust (decode res :: Maybe PlaySession)
     return $ read $ play_token ses
   where
-    rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey 
+    rurl = "http://8tracks.com/sets/new.json?api_version=3&api_key=" ++ apiKey
 
 smartUrl :: String -> String
-smartUrl smartId = 
+smartUrl smartId =
     "http://8tracks.com/mix_sets/" ++ smartId ++ ".json?include=mixes"
 
 smartGet :: String -> IO [Exp.Mix]
@@ -216,14 +232,14 @@ pprMixes :: [Exp.Mix] -> IO ()
 pprMixes mixes =
     forM_ mixes (\m -> do
         setSGR [SetConsoleIntensity BoldIntensity]
-        putStr $ "* " ++ Exp.name m 
+        putStr $ "* " ++ Exp.name m
         setSGR [SetColor Foreground Vivid Green]
         putStr $ " id=" ++ show (Exp.id m)
         putStr $ "  ▶" ++ show (Exp.plays_count m)
         putStr $ "  ♥" ++ show (Exp.likes_count m)
         putStrLn $ "  (" ++ show (Exp.tracks_count m) ++ " tracks)"
         setSGR [Reset]
-        putStrLn $ "    Description: " ++ 
+        putStrLn $ "    Description: " ++
                    unlines (map ("    " ++) (lines $ Exp.description m))
         putStrLn $ "    Tags: " ++ Exp.tag_list_cache m
         putStrLn ""
@@ -233,7 +249,7 @@ get :: FromJSON a => String -> (a -> b) -> IO b
 get rurl selector = do
     initReq <- parseUrl rurl
     let req = initReq { requestHeaders = [verHdr, keyHdr] }
-    val <- E.catches 
+    val <- E.catches
         (withManager $ \manager -> do
             res <- http req manager
             responseBody res $$+- sinkParser json)
@@ -243,7 +259,7 @@ get rurl selector = do
                         (StatusCodeException s _ _) ->
                             error $ show s
                         otherException ->
-                            error $ show otherException) 
+                            error $ show otherException)
         ]
 
     case fromJSON val of

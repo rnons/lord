@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
--- | Module of http://radioreddit.com
+-- | Module for interfacing <http://radioreddit.com>
 module Web.Radio.Reddit where
 
 import           Control.Monad (liftM)

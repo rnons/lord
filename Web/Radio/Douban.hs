@@ -1,7 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
--- | Module of http://douban.fm
-module Web.Radio.Douban where
+-- | Module for interfacing <http://douban.fm>
+module Web.Radio.Douban 
+  ( Douban (..)
+  , Channel (..)
+  , douban
+  , hot
+  , trending
+  , search
+  , pprChannels
+  ) where
 
 import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
