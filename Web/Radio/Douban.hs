@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -- | Module for interfacing <http://douban.fm>
-module Web.Radio.Douban 
+module Web.Radio.Douban
   ( Douban (..)
   , Channel (..)
   , douban
@@ -128,7 +128,7 @@ instance Radio.Radio Douban  where
                          mkQuery 0 $ "channel:0|subject_id:" ++ show aId
                     else error "This album can not be played."
     getPlaylist (MusicianId mid) =
-        getPlaylist' $ mkQuery 0 $ "channel:0|musician_id" ++ show mid
+        getPlaylist' $ mkQuery 0 $ "channel:0|musician_id:" ++ show mid
     getPlaylist (MusicianName mname) = do
         mmid <- musicianId mname
         Radio.getPlaylist (MusicianId $ read $ fromJust mmid)
