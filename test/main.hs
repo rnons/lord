@@ -3,7 +3,7 @@ import Data.Maybe (fromJust)
 import Test.Hspec
 import Test.HUnit
 
-import Web.Radio
+import Web.Radio (getPlaylist, readToken)
 import qualified Web.Radio.Cmd as Cmd
 import Web.Radio.EightTracks
 import Web.Radio.Douban
@@ -26,15 +26,15 @@ spec = describe "getPlaylist" $ do
 
     it "douban: given album url" $ do
         ss <- getPlaylist $ douban "http://music.douban.com/subject/3044758/"
-        assertNotNull ss
+        assert $ albumtitle (head ss) == "變形記"
 
     it "douban: given musician url" $ do
         ss <- getPlaylist $ douban "http://music.douban.com/musician/104585/"
-        assertNotNull ss
+        assert $ artist (head ss) == "万能青年旅店"
 
     it "douban: given musician name" $ do
-        ss <- getPlaylist $ douban "Sigur RóS"
-        assertNotNull ss
+        ss <- getPlaylist $ douban "Sigur Rós"
+        assert $ artist (head ss) == "Sigur Rós"
 
     it "8tracks: given mix id" $ do
         tok <- readToken eight "14"
