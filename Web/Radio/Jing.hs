@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 -- | Module for interfacing <http://jing.fm>
-module Web.Radio.Jing 
+module Web.Radio.Jing
   ( Jing (..)
   , JingParam
   , jing
@@ -24,14 +24,14 @@ import           Data.CaseInsensitive (mk)
 import           Data.Conduit (runResourceT, ($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
-import           Network.HTTP.Types 
+import           Network.HTTP.Types
 import           Network.HTTP.Conduit
 
 import Web.Radio
 
 type JingParam = Param Jing
 
-data Jing = Jing 
+data Jing = Jing
     { abid :: Int       -- album id
     , aid  :: Int       -- artist id
     , an   :: String    -- album name
@@ -63,17 +63,19 @@ instance Radio Jing where
         { aToken        :: ByteString
         , rToken        :: ByteString
         , uid           :: Int
-        , nick          :: ByteString 
+        , nick          :: ByteString
         , cmbt          :: String
         , highquality   :: Bool
         } deriving (Show, Generic)
 
     parsePlaylist (Object hm) = do
-        let songs = HM.lookup "result" hm >>= 
+        let songs = HM.lookup "result" hm >>=
                     \(Object hm') -> HM.lookup "items" hm'
         case fromJSON $ fromMaybe Null songs of
-            Success s -> s
+            Success s -> if null s then error "Nothing found. Please try other keywords."
+                                   else s
             Error err -> error $ "Parse playlist failed: " ++ show err
+                               ++ "\nYour token may have expired. Delete ~/.lord/lord.yml to relogin."
     parsePlaylist _ = error "Unrecognized playlist format."
 
     getPlaylist tok = do
@@ -99,7 +101,7 @@ instance Radio Jing where
             res <- http req' manager
             liftM parsePlaylist (responseBody res $$+- sinkParser json)
 
-    songUrl tok x = E.catch 
+    songUrl tok x = E.catch
         (do
             let url = "http://jing.fm/api/v1/media/song/surl"
                 type_ = if highquality tok then "NO" else "MM"
@@ -141,7 +143,7 @@ instance NeedLogin Jing where
             rtoken = HM.lookup "Jing-R-Token-Header" hmap
             parseToken :: Value -> Maybe JingParam
             parseToken (Object hm) = do
-                let user = HM.lookup "result" hm >>= 
+                let user = HM.lookup "result" hm >>=
                            \(Object hm') -> HM.lookup "usr" hm'
                 case fromJSON $ fromMaybe Null user of
                     Success u -> Token <$> atoken
@@ -156,7 +158,7 @@ instance NeedLogin Jing where
 
     data Config Jing = Config { jing :: JingParam } deriving Generic
 
-    mkConfig = Config 
+    mkConfig = Config
 
     mkParam param key = param { cmbt = key }
 
