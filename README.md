@@ -43,6 +43,22 @@ lord reddit listen <genre> [--no-daemon]
 lord reddit genres
 ```
 
+### bash completion
+
+> `optparse-applicative` has built-in support for bash completion of command line options and arguments.
+
+With bash, add to your **.bashrc**:
+
+    source <(lord --bash-completion-script `which lord`)
+
+With zsh, add to your **.zshrc**:
+
+    autoload bashcompinit
+    bashcompinit
+    source <(lord --bash-completion-script `which lord`)
+
+NOTE: <code>lord --bash-completion-script \`which lord`</code> can generate the bash_completion file on the fly. However, you can also use the installed version. The bash_completion file is installed to somewhere like **~/.cabal/share/x86_64-linux-ghc-7.6.3/lord-2.20131220/bash_completion.d/lord**.
+
 [8tracks.com]: http://8tracks.com
 [cmd.fm]: http://cmd.fm
 [radioreddit.com]: http://radioreddit.com

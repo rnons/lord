@@ -1,46 +1,13 @@
-#!/bin/bash
-# Installation:
-# - If you have system bash completion, place this in /etc/bash_completion.d or
-#   source it from $HOME/.bash_completion
-# - If you don't have system bash completion, source this from your .bashrc
-
 _lord()
 {
-    local cur prev cmds opts
-    local et_cmds cmd_cmds douban_cmds jing_cmds reddit_cmds
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local cmdline
+    CMDLINE=(--bash-completion-index $COMP_CWORD)
 
-    cmds='8tracks cmd reddit douban jing kill'
-    opts='-h --help --no-daemon'
-    et_cmds='listen search featured trending newest'
-    cmd_cmds='listen genres'
-    douban_cmds='listen search hot trending'
-    jing_cmds='listen'
-    reddit_cmds='listen genres'
+    for arg in ${COMP_WORDS[@]}; do
+        CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
+    done
 
-    case "$cur" in
-        -*)
-            COMPREPLY=( $(compgen -W "${opts}" -- $cur) );;
-    esac
-    
-    # Should be able to use function here.
-    # I mean a fucntion that compute COMPREPLY from ${*_cmds}
-    case "$prev" in
-        lord)
-            COMPREPLY=( $(compgen -W "${cmds}" -- $cur) );;
-        8tracks) 
-            COMPREPLY=( $(compgen -W "${et_cmds}" -- $cur) );;
-        cmd) 
-            COMPREPLY=( $(compgen -W "${cmd_cmds}" -- $cur) );;
-        douban) 
-            COMPREPLY=( $(compgen -W "${douban_cmds}" -- $cur) );;
-        jing) 
-            COMPREPLY=( $(compgen -W "${jing_cmds}" -- $cur) );;
-        reddit) 
-            COMPREPLY=( $(compgen -W "${reddit_cmds}" -- $cur) );;
-        *)  ;;
-    esac
+    COMPREPLY=( $(/home/rnons/.cabal/bin/lord "${CMDLINE[@]}") )
 }
-complete -F _lord lord
+
+complete -o filenames -F _lord lord
