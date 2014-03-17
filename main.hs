@@ -1,7 +1,5 @@
 import           Control.Monad (void, when)
-import qualified Data.ByteString.Char8 as C
 import           Data.Default (def)
-import           GHC.IO.FD (openFile, stdout)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Network.MPD.Commands.Extensions (toggle)
 import           Options.Applicative
@@ -9,9 +7,9 @@ import           Options.Applicative.Types (ParserPrefs)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
-import           System.IO ( IOMode(AppendMode)
-                           , hPutStr, stderr, SeekMode(..) )
-import           System.Log.FastLogger (newLoggerSet, defaultBufSize)
+import           System.IO (hPutStr, stderr, SeekMode(..))
+import           System.Log.FastLogger ( newFileLoggerSet, newStdoutLoggerSet
+                                       , defaultBufSize )
 import           System.Posix.Daemon
 import           System.Posix.Files (stdFileMode)
 import           System.Posix.IO ( fdWrite, createFile, setLock
@@ -227,7 +225,7 @@ jingListen nodaemon k = do
     tok <- readToken jing k
     case tok of
         Just tok' -> do
-            putStrLn $ "Welcome back, " ++ C.unpack (nick tok')
+            putStrLn $ "Welcome back, " ++ nick tok'
             listen nodaemon tok'
         _         -> do
             param <- login k :: IO (Param Jing)
@@ -244,11 +242,10 @@ listen nodaemon param = do
                                 return True
 
     pid <- getPidFile
-    logger <- if nodaemon' then newLoggerSet defaultBufSize stdout
-              else do
+    logger <- if nodaemon' then newStdoutLoggerSet defaultBufSize
+                           else do
                   fp <- getLogFile
-                  (fd, _) <- openFile fp AppendMode True
-                  newLoggerSet defaultBufSize fd
+                  newFileLoggerSet defaultBufSize fp
     let listen' = play logger param []
     running <- isRunning pid
     when running $ killAndWait pid

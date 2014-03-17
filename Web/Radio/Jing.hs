@@ -15,7 +15,6 @@ import           Control.Applicative ((<$>), (<*>))
 import qualified Control.Exception as E
 import           Control.Monad (liftM, mzero)
 import           Data.Aeson
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromJust, fromMaybe)
@@ -39,7 +38,7 @@ data Jing = Jing
     , d    :: String
     , fid  :: String
     , fs   :: Int       -- file size
-    , mid  :: ByteString
+    , mid  :: String
     , n    :: String    -- song name
     , tid  :: Int
     --, y    :: Bool
@@ -48,8 +47,8 @@ data Jing = Jing
 instance FromJSON Jing
 
 data Usr = Usr
-    { userid :: Int
-    , usernick :: ByteString
+    { userid   :: Int
+    , usernick :: String
     } deriving Show
 
 instance FromJSON Usr where
@@ -60,10 +59,10 @@ instance FromJSON Usr where
 
 instance Radio Jing where
     data Param Jing = Token
-        { aToken        :: ByteString
-        , rToken        :: ByteString
+        { aToken        :: String
+        , rToken        :: String
         , uid           :: Int
-        , nick          :: ByteString
+        , nick          :: String
         , cmbt          :: String
         , highquality   :: Bool
         } deriving (Show, Generic)
@@ -88,8 +87,8 @@ instance Radio Jing where
                     , ("mt", "")
                     , ("ss", "true")
                     ]
-            aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
-            rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
+            aHdr = (mk "Jing-A-Token-Header", C.pack $ aToken tok) :: Header
+            rHdr = (mk "Jing-R-Token-Header", C.pack $ rToken tok) :: Header
 
         initReq <- parseUrl url
         let req = initReq { requestHeaders = [aHdr, rHdr] }
@@ -106,10 +105,10 @@ instance Radio Jing where
             let url = "http://jing.fm/api/v1/media/song/surl"
                 type_ = if highquality tok then "NO" else "MM"
                 query = [ ("type", Just type_)
-                        , ("mid", Just $ mid x)
+                        , ("mid", Just $ C.pack $ mid x)
                         ] :: Query
-                aHdr = (mk "Jing-A-Token-Header", aToken tok) :: Header
-                rHdr = (mk "Jing-R-Token-Header", rToken tok) :: Header
+                aHdr = (mk "Jing-A-Token-Header", C.pack $ aToken tok) :: Header
+                rHdr = (mk "Jing-R-Token-Header", C.pack $ rToken tok) :: Header
 
             initReq <- parseUrl url
             let req = initReq { method = "POST"
@@ -146,8 +145,8 @@ instance NeedLogin Jing where
                 let user = HM.lookup "result" hm >>=
                            \(Object hm') -> HM.lookup "usr" hm'
                 case fromJSON $ fromMaybe Null user of
-                    Success u -> Token <$> atoken
-                                       <*> rtoken
+                    Success u -> Token <$> fmap C.unpack atoken
+                                       <*> fmap C.unpack rtoken
                                        <*> (Just $ userid u)
                                        <*> (Just $ usernick u)
                                        <*> Just keywords
