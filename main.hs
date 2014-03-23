@@ -3,11 +3,10 @@ import           Data.Default (def)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Network.MPD.Commands.Extensions (toggle)
 import           Options.Applicative
-import           Options.Applicative.Types (ParserPrefs)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
-import           System.IO (hPutStr, stderr, SeekMode(..))
+import           System.IO (hPutStrLn, stderr, SeekMode(..))
 import           System.Log.FastLogger ( newFileLoggerSet, newStdoutLoggerSet
                                        , defaultBufSize )
 import           System.Posix.Daemon
@@ -134,15 +133,19 @@ customExecParser' pprefs pinfo = do
     when (null args) $ lordStatus >> exitSuccess
 
     case execParserPure pprefs pinfo args of
-        Right a -> return a
-        Left failure -> do
+        Success a -> return a
+        Failure failure -> do
             progn <- getProgName
-            let c = errExitCode failure
-            msg <- errMessage failure progn
-            case c of
-                ExitSuccess -> putStr msg
-                _           -> hPutStr stderr msg
-            exitWith c
+            let (msg, exit) = execFailure failure progn
+            case exit of
+                ExitSuccess -> putStrLn msg
+                _           -> hPutStrLn stderr msg
+            exitWith exit
+        CompletionInvoked compl -> do
+            progn <- getProgName
+            msg <- execCompletion compl progn
+            putStr msg
+            exitWith ExitSuccess
 
 cmdOptions :: Parser Command
 cmdOptions = CmdFM <$> subparser
