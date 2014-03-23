@@ -1,5 +1,5 @@
 name:                lord
-version:             2.20131220
+version:             2.20140323
 synopsis:            A command line interface to online radios.
 description:
     A unified command line interface to several online radios, use mpd (<http://musicpd.org>) as backend by default. Will fallback to mplayer (<http://www.mplayerhq.hu>) when mpd is unavailable.

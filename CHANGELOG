@@ -1,5 +1,9 @@
 CHANGELOG
 
+2.20131220 -> 2.20140323
+  - Update to aeson-0.7
+  - Fix douban listen musician/album
+
 2.20131203 -> 2.20131220
   - Update to fast-logger-2.0
   - New command: lord douban listen [<album_url> | <musician_url>]
