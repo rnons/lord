@@ -16,7 +16,7 @@ data Session = Session
     { user :: User
     , status :: String
     , errors :: Maybe String
-    , notices :: String
+    , notices :: Maybe String
     , logged_in :: Bool
     , api_version :: Int
     } deriving (Show, Generic)

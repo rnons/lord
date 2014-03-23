@@ -2,6 +2,7 @@ CHANGELOG
 
 2.20140323 -> 2.20140324
   - Update to optparse-applicative-0.8
+  - Slight fix to 8tracks.com api
 
 2.20131220 -> 2.20140323
   - Update to aeson-0.7
