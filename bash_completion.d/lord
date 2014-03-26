@@ -7,7 +7,7 @@ _lord()
         CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
     done
 
-    COMPREPLY=( $(/home/rnons/.cabal/bin/lord "${CMDLINE[@]}") )
+    COMPREPLY=( $(~/.cabal/bin/lord "${CMDLINE[@]}") )
 }
 
 complete -o filenames -F _lord lord
