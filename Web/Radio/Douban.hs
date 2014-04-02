@@ -16,6 +16,7 @@ import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as C
+import qualified Data.ByteString.Lazy.Char8 as LC
 import           Data.Char (isDigit)
 import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
@@ -23,7 +24,11 @@ import qualified Data.HashMap.Strict as HM
 import           Data.List (isPrefixOf)
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
+import           Network.Browser (browse, request, setOutHandler)
+import           Network.HTTP (getRequest)
+import           Network.HTTP.Base (rspBody)
 import           Network.HTTP.Conduit
+--import           Network.HTTP.Conduit.Browser (browse, makeRequestLbs)
 import           Network.HTTP.Types (urlEncode, renderQuery, Query)
 import           Prelude hiding (id)
 import           System.Console.ANSI
@@ -203,14 +208,15 @@ search key = search' rurl
           C.unpack (urlEncode True (C.pack $ encodeString key))
 
 
+-- As http-conduit-browser can't build with http-conduit-2.0, add
+-- additional dependency on HTTP package.
 search' :: String -> IO [Channel]
 search' rurl = do
-    req <- parseUrl rurl
-    (Object hm) <- withManager $ \manager -> do
-        res <- http req manager
-        responseBody res $$+- sinkParser json
-
-    let (Object hm') = fromJust $ HM.lookup "data" hm
+    (_, rsp) <- browse $ do
+        setOutHandler $ const (return ())
+        request $ getRequest rurl
+    let (Object hm) = fromJust $ decode $ LC.pack $ rspBody rsp
+        (Object hm') = fromJust $ HM.lookup "data" hm
         resData = fromJust $ HM.lookup "channels" hm'
         channels = fromJSON resData :: Result [Channel]
     case channels of

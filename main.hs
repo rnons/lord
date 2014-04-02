@@ -145,7 +145,7 @@ customExecParser' pprefs pinfo = do
             progn <- getProgName
             msg <- execCompletion compl progn
             putStr msg
-            exitWith ExitSuccess
+            exitSuccess
 
 cmdOptions :: Parser Command
 cmdOptions = CmdFM <$> subparser
