@@ -226,8 +226,10 @@ search' rurl = do
 douban :: String -> Radio.Param Douban
 douban k
     | isChId k = ChannelId $ read k
-    | aPattern `isPrefixOf` k = Album $ read $ init $ drop (length aPattern) k
-    | mPattern `isPrefixOf` k = MusicianId $ read $ init $ drop (length mPattern) k
+    | aPattern `isPrefixOf` k = 
+        Album $ read $ takeWhile (/= '/') $ drop (length aPattern) k
+    | mPattern `isPrefixOf` k = 
+        MusicianId $ read $ takeWhile (/= '/') $ drop (length mPattern) k
     | otherwise = MusicianName k
   where
     isChId = and . fmap isDigit
