@@ -7,8 +7,7 @@ import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
 import           System.IO (hPutStrLn, stderr, SeekMode(..))
-import           System.Log.FastLogger ( newFileLoggerSet, newStdoutLoggerSet
-                                       , defaultBufSize )
+import           System.Log.FastLogger ( newFileLoggerSet, newStdoutLoggerSet )
 import           System.Posix.Daemon
 import           System.Posix.Files (stdFileMode)
 import           System.Posix.IO ( fdWrite, createFile, setLock
@@ -245,10 +244,8 @@ listen nodaemon param = do
                                 return True
 
     pid <- getPidFile
-    logger <- if nodaemon' then newStdoutLoggerSet defaultBufSize
-                           else do
-                  fp <- getLogFile
-                  newFileLoggerSet defaultBufSize fp
+    logger <- if nodaemon' then newStdoutLoggerSet 0
+                           else getLogFile >>= newFileLoggerSet 0
     let listen' = play logger param []
     running <- isRunning pid
     when running $ killAndWait pid

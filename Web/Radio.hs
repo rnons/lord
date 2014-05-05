@@ -14,7 +14,6 @@ module Web.Radio
   , writeLog
   ) where
 
-import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
@@ -186,12 +185,10 @@ class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
 
     saveToken :: Param a -> IO ()
     saveToken tok = do
-        home <- getLordDir
-        let yml = home ++ "/lord.yml"
+        yml <- getConfig
         exist <- doesFileExist yml
-        bs <- if exist
-            then B.readFile yml
-            else return ""
+        bs <- if exist then B.readFile yml
+                       else return ""
         let config = mkConfig tok
         B.writeFile yml $ B.append bs (encode config)
         putStrLn $ "Your token has been saved to " ++ yml
@@ -201,11 +198,10 @@ class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
     readToken :: FromJSON (Config a)
               => (Config a -> Param a) -> String -> IO (Maybe (Param a))
     readToken selector keywords = do
-        home <- getLordDir
-        let yml = home ++ "/lord.yml"
+        yml <- getConfig
         exist <- doesFileExist yml
         if exist
-           then do
+            then do
                 conf <- decodeFile yml
                 case conf of
                     Nothing -> error $ "Invalid YAML file: " ++ show conf
@@ -216,10 +212,13 @@ class (Radio a, ToJSON (Param a), ToJSON (Config a)) => NeedLogin a where
                             Error err -> do
                                 print $ "Parse token failed: " ++ show err
                                 return Nothing
-           else return Nothing
+            else return Nothing
 
 getLordDir :: IO FilePath
 getLordDir = (++ "/.lord") <$> getHomeDirectory
+
+getConfig :: IO FilePath
+getConfig = (++ "/lord.yml") <$> getLordDir
 
 getPidFile :: IO FilePath
 getPidFile = (++ "/lord.pid") <$> getLordDir
@@ -233,7 +232,7 @@ getStateFile = (++ "/lordstate") <$> getLordDir
 formatLogMessage :: IO ZonedDate -> String -> IO LogStr
 formatLogMessage getdate msg = do
     now <- getdate
-    return $ toLogStr now <> " : " <> toLogStr (encodeString msg) <> "\n"
+    return $ toLogStr now <> " : " <> toLogStr msg <> "\n"
 
 writeLog :: LoggerSet -> String -> IO ()
 writeLog l msg = do
