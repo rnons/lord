@@ -117,6 +117,7 @@ instance Radio.Radio Douban  where
                       | Album Int
                       | MusicianId Int
                       | MusicianName String
+                      | Programme Int
 
     -- TODO: those without ssid filed are ads, filter them out!
     parsePlaylist (Object hm) = do
@@ -137,6 +138,8 @@ instance Radio.Radio Douban  where
     getPlaylist (MusicianName mname) = do
         mmid <- musicianId mname
         Radio.getPlaylist (MusicianId $ read $ fromJust mmid)
+    getPlaylist (Programme pid) =
+        getPlaylist' $ mkQuery 0 $ "channel:0|programme_id:" ++ show pid
 
     songUrl _ x = return $ url x
 
@@ -227,11 +230,14 @@ douban :: String -> Radio.Param Douban
 douban k
     | isChId k = ChannelId $ read k
     | aPattern `isPrefixOf` k = 
-        Album $ read $ takeWhile (/= '/') $ drop (length aPattern) k
+        Album $ read $ takeWhile isDigit $ drop (length aPattern) k
     | mPattern `isPrefixOf` k = 
-        MusicianId $ read $ takeWhile (/= '/') $ drop (length mPattern) k
+        MusicianId $ read $ takeWhile isDigit $ drop (length mPattern) k
+    | pPattern `isPrefixOf` k = 
+        Programme $ read $ takeWhile isDigit $ drop (length pPattern) k
     | otherwise = MusicianName k
   where
     isChId = and . fmap isDigit
     aPattern = "http://music.douban.com/subject/"
     mPattern = "http://music.douban.com/musician/"
+    pPattern = "http://music.douban.com/programme/"
