@@ -36,6 +36,10 @@ spec = describe "getPlaylist" $ do
         ss <- getPlaylist $ douban "Sigur Rós"
         assert $ artist (head ss) == "Sigur Rós"
 
+    it "douban: given programme url" $ do
+        ss <- getPlaylist $ douban "http://music.douban.com/programme/284459"
+        assertNotNull ss
+
     it "8tracks: given mix id" $ do
         tok <- readToken eight "14"
         ss <- getPlaylist $ fromJust tok

@@ -159,8 +159,8 @@ doubanOptions :: Parser Command
 doubanOptions = DoubanFM <$> subparser
     ( command "listen"
         (info (helper <*> (DoubanListen <$> argument str (
-                  metavar "[<channel_id> | <album_url> | <muscian_url> | <musician_name>]")))
-              (progDesc "Provide channel_id/album_url/musician_url/musician_name to listen to douban.fm"))
+                  metavar "[<channel_id> | <album_url> | <muscian_url> | <musician_name> | <programme_url>]")))
+              (progDesc "Provide channel_id/album_url/musician_url/musician_name/programme_url to listen to douban.fm"))
     <> command "search"
         (info (helper <*> (DoubanSearch <$> argument str (metavar "KEYWORDS")))
               (progDesc "Search channels"))

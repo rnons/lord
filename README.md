@@ -33,7 +33,7 @@ lord 8tracks [featured | trending | newest]
 lord cmd listen <genre> [--no-daemon]
 lord cmd genres
 
-lord douban listen [<channel_id> | <album_url> | <musician_url> | <musician_name>] [--no-daemon]
+lord douban listen [<channel_id> | <album_url> | <musician_url> | <musician_name> | <programme_url] [--no-daemon]
 lord douban search <keywords>
 lord douban [hot | trending]
 
