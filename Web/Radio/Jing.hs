@@ -14,13 +14,14 @@ import           Codec.Binary.UTF8.String (encodeString)
 import           Control.Applicative ((<$>), (<*>))
 import qualified Control.Exception as E
 import           Control.Monad (liftM, mzero)
+import           Control.Monad.Trans.Resource (runResourceT)
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as C
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Data.CaseInsensitive (mk)
-import           Data.Conduit (runResourceT, ($$+-))
+import           Data.Conduit (($$+-))
 import           Data.Conduit.Attoparsec (sinkParser)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Types
