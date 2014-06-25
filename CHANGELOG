@@ -1,5 +1,13 @@
 CHANGELOG
 
+2.20140324 -> 2.20140625
+  - Update to optpare-applicative-0.8
+  - Fix 8tracks.com api
+  - Fix douban search api and musician url parse
+  - Fix log encoding
+  - Can listen to douban programme
+  - Depends on conduit-extra and resourcet
+
 2.20140323 -> 2.20140324
   - Update to optparse-applicative-0.8
   - Slight fix to 8tracks.com api
