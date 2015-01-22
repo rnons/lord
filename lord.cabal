@@ -1,5 +1,5 @@
 name:                lord
-version:             2.20140625
+version:             2.20150122
 synopsis:            A command line interface to online radios.
 description:
     A unified command line interface to several online radios, use mpd (<http://musicpd.org>) as backend by default. Will fallback to mplayer (<http://www.mplayerhq.hu>) when mpd is unavailable.
@@ -47,7 +47,7 @@ maintainer:          remotenonsense@gmail.com
 category:            Web, Music
 build-type:          Simple
 cabal-version:       >=1.10
-tested-with:         GHC == 7.8.2
+tested-with:         GHC == 7.8.3
 data-files:          bash_completion.d/lord
 extra-source-files:  CHANGELOG
 
@@ -71,7 +71,7 @@ library
                         HTTP >= 4000.2,
                         http-conduit >= 1.9,
                         http-types >= 0.8,
-                        libmpd >= 0.8,
+                        libmpd >= 0.9,
                         process >= 1.1,
                         resourcet >= 1.1,
                         text >= 0.11,
@@ -112,8 +112,8 @@ executable lord
                         HTTP >= 4000.2,
                         http-conduit >= 1.9,
                         http-types >= 0.8,
-                        libmpd >= 0.8,
-                        optparse-applicative >= 0.8,
+                        libmpd >= 0.9,
+                        optparse-applicative >= 0.11,
                         process >= 1.1,
                         resourcet >= 1.1,
                         text >= 0.11,
@@ -148,8 +148,8 @@ test-suite test
                         http-conduit >= 1.9,
                         http-types >= 0.8,
                         HUnit >= 1.2,
-                        libmpd >= 0.8,
-                        optparse-applicative >= 0.5,
+                        libmpd >= 0.9,
+                        optparse-applicative >= 0.11,
                         process >= 1.1,
                         text >= 0.11,
                         transformers >= 0.3,

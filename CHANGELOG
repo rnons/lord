@@ -1,5 +1,9 @@
 CHANGELOG
 
+2.20140625 -> 2.20150122
+  - Update to libmpd-0.9
+  - Update to optpare-applicative-0.11
+
 2.20140324 -> 2.20140625
   - Update to optpare-applicative-0.8
   - Fix 8tracks.com api
