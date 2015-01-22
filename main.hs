@@ -3,6 +3,7 @@ import           Data.Default (def)
 import           Network.MPD (withMPD, clear, status, stState)
 import           Network.MPD.Commands.Extensions (toggle)
 import           Options.Applicative
+import           Options.Applicative.Help.Types (renderHelp)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit (exitWith, exitSuccess, ExitCode(..))
@@ -135,10 +136,10 @@ customExecParser' pprefs pinfo = do
         Success a -> return a
         Failure failure -> do
             progn <- getProgName
-            let (msg, exit) = execFailure failure progn
+            let (h, exit, cols) = execFailure failure progn
             case exit of
-                ExitSuccess -> putStrLn msg
-                _           -> hPutStrLn stderr msg
+                ExitSuccess -> putStrLn $ renderHelp cols h
+                _           -> hPutStrLn stderr $ renderHelp cols h
             exitWith exit
         CompletionInvoked compl -> do
             progn <- getProgName
