@@ -20,11 +20,11 @@ import           Control.Concurrent.MVar
 import           Control.Monad (liftM, when, void)
 import           Data.Aeson hiding (encode)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as C
 import           Data.Maybe (isJust, fromJust)
 import           Data.Monoid ((<>))
+import           Data.String (fromString)
 import           Data.Yaml
-import           Network.MPD hiding (play, pause, Value)
+import           Network.MPD hiding (play, pause, config, Value)
 import qualified Network.MPD as MPD
 import           Network.MPD.Core (getResponse)
 import           Network.Wai.Logger (ZonedDate, clockDateCacher)
@@ -70,10 +70,11 @@ class FromJSON a => Radio a where
     reportLoop param x = do
         time <- liftM stTime <$> withMPD status
         case time of
-            Right (elapsed, _) ->
+            Right (Just (elapsed, _)) ->
                 if elapsed < 30
                     then threadDelay (5*1000000) >> reportLoop param x
                     else report param x
+            Right Nothing -> return ()
             Left err -> print err
 
     play :: LoggerSet -> Param a -> [a] -> IO ()
@@ -92,7 +93,7 @@ playWithMPD logger reqData (x:xs) = do
     print surl
     when (surl /= "") $ do
         logAndReport logger reqData x
-        mpdLoad $ Path $ C.pack surl
+        mpdLoad $ fromString surl
         takeMVar eof                     -- Finished
     playWithMPD logger reqData xs
   where
