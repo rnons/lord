@@ -180,7 +180,7 @@ pprChannels chs =
         putStrLn $ " cid=" ++ show (id c)
         setSGR [Reset]
         let folding = foldr (\x acc ->
-                      if x `elem` "\r\n" then ' ':acc else x:acc) []
+                      if x `elem` ['\r', '\n'] then ' ':acc else x:acc) []
         putStrLn $ "    Intro: " ++ folding (intro c)
         putStr "    Hot songs: "
         forM_ (hot_songs c) (\s -> putStr $ s ++ ", ")
